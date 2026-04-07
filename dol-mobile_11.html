@@ -1,0 +1,2603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Dol</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Cinzel:wght@400;600&family=Cormorant+Garamond:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --felt:#14381f;--felt2:#1a4a28;--felt3:#0e2416;
+  --gold:#d4a843;--gold2:#f0c84a;--gold3:#8a6520;
+  --cream:#fdf8ee;--red:#c41f1f;--ink:#12100a;
+  --text:#ede0c4;--dim:#7a9070;--faint:#3d5a40;
+  --ally:#2e7eb8;--opp:#c44a2a;
+  --rim:#c49a3c;--rim2:#8b5e1a;
+  --bg:#060c08;
+  --card-w:58px;--card-h:84px;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bot:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);}
+body{font-family:'Cormorant Garamond',Georgia,serif;display:flex;flex-direction:column;height:100dvh;}
+
+/* ══════════════ SCREENS ══════════════ */
+.screen{
+  position:fixed;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(6,12,8,0.97);z-index:100;
+  padding:24px;
+  padding-top:calc(24px + var(--safe-top));
+  padding-bottom:calc(24px + var(--safe-bot));
+}
+.screen.hidden{display:none!important;}
+
+/* ── START ── */
+#start-screen{gap:8px;text-align:center;}
+.game-title{
+  font-family:'Cinzel Decorative',serif;
+  font-size:clamp(3rem,12vw,5rem);
+  color:var(--gold);
+  letter-spacing:0.15em;
+  text-shadow:0 0 60px rgba(212,168,67,0.5),0 4px 0 rgba(0,0,0,0.6);
+  margin-bottom:4px;
+}
+.game-sub{font-family:'Cinzel',serif;font-size:clamp(0.55rem,2vw,0.7rem);letter-spacing:0.4em;color:var(--dim);text-transform:uppercase;margin-bottom:32px;}
+.btn{
+  font-family:'Cinzel',serif;font-size:clamp(0.75rem,3vw,0.9rem);font-weight:600;
+  color:var(--ink);background:linear-gradient(150deg,var(--gold2),var(--gold),var(--gold3));
+  border:none;padding:14px 40px;border-radius:4px;cursor:pointer;
+  letter-spacing:0.15em;text-transform:uppercase;
+  box-shadow:0 3px 0 rgba(0,0,0,0.5),0 8px 32px rgba(212,168,67,0.3);
+  transition:transform 0.1s,box-shadow 0.1s;
+  min-height:52px;
+}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,0.5);}
+.btn-ghost{
+  font-family:'Cinzel',serif;font-size:clamp(0.65rem,2.5vw,0.78rem);
+  color:var(--dim);background:transparent;border:1px solid rgba(255,255,255,0.1);
+  padding:12px 32px;border-radius:4px;cursor:pointer;letter-spacing:0.12em;text-transform:uppercase;
+  min-height:48px;transition:border-color 0.2s,color 0.2s;
+}
+.btn-ghost:active{border-color:var(--gold);color:var(--gold);}
+.start-btns{display:flex;flex-direction:column;gap:12px;width:100%;max-width:280px;align-items:center;}
+
+/* ── DRAW SCREEN ── */
+#draw-screen{gap:12px;}
+.screen-title{font-family:'Cinzel',serif;font-size:clamp(1rem,4vw,1.3rem);color:var(--gold);letter-spacing:0.1em;text-align:center;}
+.screen-sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:clamp(0.8rem,3vw,1rem);color:var(--dim);text-align:center;}
+/* Draw grid: all 4 players in a single row, evenly spaced */
+.draw-grid{
+  display:flex;flex-direction:row;align-items:flex-end;justify-content:center;
+  gap:10px;width:100%;flex-wrap:nowrap;padding:0 8px;
+}
+.draw-slot{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto;}
+.draw-slot.you-slot{order:-1;} /* You always first */
+.draw-label{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;color:var(--dim);text-transform:uppercase;}
+.draw-label.you-label{color:var(--gold);}
+.draw-card{
+  width:70px;height:100px;border-radius:10px;
+  position:relative;cursor:pointer;
+  box-shadow:0 4px 20px rgba(0,0,0,0.6);
+  transition:transform 0.22s cubic-bezier(.2,.8,.4,1);
+}
+/* Draw card face — sized for draw cards */
+.draw-card .cf-rank{font-size:0.85rem;font-weight:700;line-height:1;}
+.draw-card .cf-suit-sm{font-size:0.65rem;line-height:1;}
+.draw-card .cf-suit-lg{font-size:1.5rem;line-height:1;}
+.draw-card .cf-corner.tl{top:4px;left:5px;}
+.draw-card .cf-corner.br{bottom:4px;right:5px;}
+.draw-card:active{transform:scale(0.96);}
+.card-back{
+  position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(145deg,#1a3670,#1e3f80);
+  border:2px solid rgba(255,255,255,0.15);
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity 0.3s;
+}
+.card-back::before{
+  content:'';position:absolute;inset:5px;border:1px solid rgba(255,255,255,0.1);border-radius:6px;
+  background:repeating-linear-gradient(-45deg,transparent,transparent 3px,rgba(255,255,255,0.03) 3px,rgba(255,255,255,0.03) 6px);
+}
+.card-back::after{content:'✦';color:rgba(255,255,255,0.2);font-size:2rem;position:relative;z-index:1;}
+.you-slot .card-back{border-color:rgba(212,168,67,0.4);background:linear-gradient(145deg,#162d5e,#1a3572);}
+.tap-to-flip{
+  position:absolute;bottom:8px;left:0;right:0;text-align:center;
+  font-family:'Cinzel',serif;font-size:0.38rem;letter-spacing:0.1em;color:rgba(212,168,67,0.8);
+  z-index:2;
+}
+.card-front{
+  position:absolute;inset:0;border-radius:inherit;
+  background:var(--cream);border:1px solid rgba(0,0,0,0.1);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity 0.3s;
+  overflow:hidden;
+}
+.draw-card.revealed .card-back{opacity:0;}
+.draw-card.revealed .card-front{opacity:1;}
+.draw-card.winner-card .card-front{box-shadow:0 0 24px rgba(212,168,67,1),inset 0 0 0 2px var(--gold);}
+#draw-result{font-family:'Cinzel',serif;font-size:clamp(0.8rem,3vw,1rem);color:var(--gold2);text-align:center;min-height:1.4em;}
+
+/* ── TRUMP SCREEN ── */
+#trump-screen{gap:20px;}
+#trump-hand-preview{
+  display:flex;justify-content:center;gap:-8px;
+  margin-bottom:8px;
+}
+.suit-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:300px;}
+.suit-btn{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:16px 8px;border-radius:12px;border:1px solid transparent;
+  cursor:pointer;background:rgba(255,255,255,0.05);
+  transition:all 0.18s;
+}
+.suit-btn:active{transform:scale(0.96);}
+.suit-btn.red-suit{color:var(--red);border-color:rgba(196,31,31,0.35);}
+.suit-btn.blk-suit{color:var(--text);border-color:rgba(240,224,188,0.2);}
+.suit-btn:active,.suit-btn:hover{border-color:var(--gold);background:rgba(212,168,67,0.12);}
+.suit-sym{font-size:2.4rem;line-height:1;}
+.suit-name{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;}
+
+/* ══════════════ GAME UI ══════════════ */
+#game{
+  display:none;
+  flex-direction:column;
+  height:100dvh;
+  overflow:hidden;
+}
+#game.active{display:flex;}
+
+/* ── TOP BAR ── */
+#topbar{
+  flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(0,0,0,0.7);
+  border-bottom:1px solid rgba(212,168,67,0.15);
+  padding:6px 12px;
+  padding-top:calc(6px + var(--safe-top));
+  gap:8px;
+}
+.team-score{display:flex;flex-direction:column;align-items:center;}
+.team-lbl{font-family:'Cinzel',serif;font-size:0.4rem;letter-spacing:0.14em;color:var(--dim);text-transform:uppercase;}
+.team-val{font-family:'Cinzel Decorative',serif;font-size:1.4rem;color:var(--gold);line-height:1;}
+.team-val.ours{color:var(--gold2);}
+#trump-display{display:flex;flex-direction:column;align-items:center;gap:1px;}
+.trump-lbl{font-family:'Cinzel',serif;font-size:0.38rem;letter-spacing:0.14em;color:var(--faint);text-transform:uppercase;}
+.trump-val{display:flex;align-items:center;gap:4px;}
+.trump-sym{font-size:1.3rem;line-height:1;}
+.trump-name{font-family:'Cinzel',serif;font-size:0.65rem;color:var(--gold);font-weight:600;}
+
+/* ── TABLE AREA ── */
+#table-area{
+  flex:1;min-height:0;
+  position:relative;
+  background:radial-gradient(ellipse at 50% 35%,var(--felt2) 0%,var(--felt) 55%,var(--felt3) 100%);
+  overflow:hidden;
+}
+/* felt texture */
+#table-area::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:
+    repeating-linear-gradient(0deg,rgba(0,0,0,0.025) 0,rgba(0,0,0,0.025) 1px,transparent 1px,transparent 3px),
+    repeating-linear-gradient(90deg,rgba(0,0,0,0.025) 0,rgba(0,0,0,0.025) 1px,transparent 1px,transparent 3px);
+}
+#table-area::after{
+  content:'✦';position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);
+  font-size:5rem;color:rgba(255,255,255,0.02);pointer-events:none;
+}
+
+/* ── OPPONENTS ── proper table seating ── */
+#opponents{
+  position:absolute;inset:0;
+  pointer-events:none;
+}
+.opp-slot{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  pointer-events:all;
+  position:absolute;
+}
+/* Ally sits directly across from you — top-centre */
+.opp-slot.ally-slot{
+  top:8px;left:50%;transform:translateX(-50%);
+}
+/* Opp Left — left side, vertically centred */
+#slot-l{
+  left:6px;top:50%;transform:translateY(-50%);
+}
+/* Opp Right — right side, vertically centred */
+#slot-r{
+  right:6px;top:50%;transform:translateY(-50%);
+}
+.opp-av{
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(0,0,0,0.55);border:2px solid rgba(212,168,67,0.25);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.2rem;position:relative;
+  transition:border-color 0.2s,box-shadow 0.2s;
+}
+.opp-av.active-av{
+  border-color:var(--gold);
+  box-shadow:0 0 0 2px rgba(212,168,67,0.3),0 0 18px rgba(212,168,67,0.7);
+  animation:av-pulse 1.4s ease-in-out infinite;
+}
+.opp-av.ally-av{border-color:rgba(46,126,184,0.5);}
+@keyframes av-pulse{0%,100%{box-shadow:0 0 0 2px rgba(212,168,67,0.3),0 0 14px rgba(212,168,67,0.5);}50%{box-shadow:0 0 0 4px rgba(212,168,67,0.15),0 0 28px rgba(212,168,67,0.8);}}
+.trump-star{
+  position:absolute;bottom:-3px;right:-3px;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--gold);border:1.5px solid var(--ink);
+  font-size:0.5rem;display:flex;align-items:center;justify-content:center;color:var(--ink);
+}
+.opp-name{font-family:'Cinzel',serif;font-size:0.38rem;letter-spacing:0.1em;color:var(--text);text-transform:uppercase;}
+.opp-badges{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin-top:2px;}
+.badge{
+  font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.04em;
+  padding:2px 7px;border-radius:8px;white-space:nowrap;line-height:1.4;
+}
+.d-badge{background:rgba(212,168,67,0.15);border:1px solid rgba(212,168,67,0.35);color:var(--gold);}
+.i-badge{background:rgba(46,126,184,0.15);border:1px solid rgba(46,126,184,0.35);color:var(--ally);}
+.d-badge.lit{background:rgba(212,168,67,0.32);border-color:var(--gold);color:var(--gold2);}
+.i-badge.lit{background:rgba(46,126,184,0.32);border-color:var(--ally);}
+/* Your team badges — slightly bigger since they're your own */
+#your-info .badge{font-size:0.58rem;padding:3px 9px;}
+/* bot card backs */
+.bot-cards{display:flex;margin-top:2px;}
+.bot-card{
+  width:12px;height:18px;border-radius:2px;margin:0 -2px;
+  background:linear-gradient(145deg,#1a3670,#1e3f80);
+  border:1px solid rgba(255,255,255,0.12);
+  box-shadow:1px 1px 3px rgba(0,0,0,0.5);
+}
+
+/* ── PLAY AREA (centre) ── */
+#play-area{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:220px;height:200px;
+  display:flex;align-items:center;justify-content:center;
+}
+.played-card{
+  position:absolute;
+  width:54px;height:78px;
+  border-radius:7px;
+  background:var(--cream);
+  border:1px solid rgba(0,0,0,0.12);
+  box-shadow:2px 4px 14px rgba(0,0,0,0.6);
+  overflow:hidden;
+  will-change:transform,opacity;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+  animation:card-drop 0.32s cubic-bezier(.2,.9,.3,1) both;
+}
+.played-card.win-card{
+  box-shadow:0 0 22px rgba(212,168,67,0.9),2px 4px 12px rgba(0,0,0,0.4);
+  border:1px solid var(--gold);
+  transition:box-shadow 0.3s ease,border 0.3s ease;
+}
+@keyframes card-drop{
+  from{opacity:0;transform:translateY(-24px) scale(0.7);}
+  to{opacity:1;}
+}
+
+/* ── STATUS ── */
+#status-bar{
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--dim);background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.06);
+  padding:5px 14px;border-radius:20px;white-space:nowrap;z-index:5;
+  transition:color 0.3s;
+}
+#status-bar.your-turn{color:var(--gold);border-color:rgba(212,168,67,0.3);animation:s-glow 1.6s ease-in-out infinite;}
+@keyframes s-glow{0%,100%{box-shadow:none;}50%{box-shadow:0 0 14px rgba(212,168,67,0.35);}}
+
+/* ── BOTTOM PANEL ── */
+#bottom-panel{
+  flex-shrink:0;
+  background:rgba(0,0,0,0.5);
+  border-top:1px solid rgba(212,168,67,0.15);
+}
+#your-info{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:5px 12px;border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.you-badges{display:flex;gap:6px;align-items:center;}
+.you-lbl{font-family:'Cinzel',serif;font-size:0.4rem;letter-spacing:0.1em;color:var(--dim);text-transform:uppercase;}
+#round-info{font-family:'Cinzel',serif;font-size:0.38rem;letter-spacing:0.08em;color:var(--faint);text-transform:uppercase;}
+
+/* ── HAND ── */
+#hand-area{
+  display:flex;align-items:flex-end;justify-content:center;
+  padding:8px 6px;
+  padding-bottom:calc(10px + var(--safe-bot));
+  min-height:110px;
+  overflow:visible;
+  max-width:100vw;
+  width:100%;
+}
+.hand-card{
+  /* Large enough to read clearly on any phone */
+  width:60px;height:88px;
+  border-radius:9px;
+  background:var(--cream);
+  border:1px solid rgba(0,0,0,0.15);
+  box-shadow:2px 4px 12px rgba(0,0,0,0.65);
+  position:relative;flex-shrink:0;cursor:pointer;
+  overflow:hidden;
+  transition:transform 0.2s cubic-bezier(.34,1.4,.64,1),box-shadow 0.2s ease;
+  will-change:transform;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+}
+.hand-card:active{transform:translateY(-22px) scale(1.1)!important;box-shadow:2px 12px 28px rgba(0,0,0,0.85);z-index:30;}
+.hand-card.unplayable{opacity:0.4;cursor:not-allowed;}
+.hand-card.unplayable:active{transform:none!important;}
+.hand-card.is-trump{
+  border-color:rgba(212,168,67,0.6);
+  box-shadow:2px 4px 12px rgba(0,0,0,0.65),0 0 10px rgba(212,168,67,0.3);
+}
+
+/* ── CARD FACE — large readable text ── */
+.cf-corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:1;}
+.cf-corner.tl{top:4px;left:4px;}
+.cf-corner.br{bottom:4px;right:4px;transform:rotate(180deg);}
+/* Corner rank & suit — compact, readable */
+.cf-rank{
+  font-family:'Cinzel',serif;
+  font-size:0.82rem;
+  font-weight:700;
+  line-height:1;
+  letter-spacing:-0.02em;
+}
+.cf-suit-sm{font-size:0.62rem;line-height:1;}
+/* Centre suit — larger but constrained to middle zone of card */
+.cf-suit-lg{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  font-size:1.6rem;
+  line-height:1;
+  pointer-events:none;
+}
+/* Played card — smaller cards */
+.played-card .cf-rank{font-size:0.65rem;}
+.played-card .cf-suit-sm{font-size:0.52rem;}
+.played-card .cf-suit-lg{font-size:1.15rem;}
+
+/* ── RESULT SCREEN ── */
+#result-screen{gap:14px;}
+#result-screen .screen-title{font-size:clamp(1.2rem,5vw,1.6rem);}
+.result-card-box{
+  background:rgba(10,22,12,0.95);border:1px solid rgba(212,168,67,0.3);
+  border-radius:16px;padding:20px;width:100%;max-width:340px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.result-teams{display:flex;gap:14px;}
+.rt-blk{flex:1;text-align:center;padding:12px 8px;border-radius:10px;}
+.rt-blk.ours{background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.2);}
+.rt-blk.theirs{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);}
+.rt-lbl{font-family:'Cinzel',serif;font-size:0.42rem;letter-spacing:0.16em;color:var(--dim);text-transform:uppercase;margin-bottom:6px;}
+.rt-suits{font-size:1.1rem;display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-bottom:3px;min-height:1.4rem;}
+.rt-detail{font-family:'Cinzel',serif;font-size:0.5rem;color:var(--ally);letter-spacing:0.04em;margin-bottom:6px;}
+.rt-pts{font-family:'Cinzel Decorative',serif;font-size:1.8rem;color:var(--gold);line-height:1;}
+.rt-pts.loss{color:var(--dim);}
+.rt-pts-lbl{font-family:'Cinzel',serif;font-size:0.4rem;color:var(--dim);letter-spacing:0.1em;text-transform:uppercase;}
+.result-div{height:1px;background:linear-gradient(to right,transparent,rgba(212,168,67,0.25),transparent);}
+.result-total{text-align:center;}
+.result-total-lbl{font-family:'Cinzel',serif;font-size:0.45rem;letter-spacing:0.14em;color:var(--dim);text-transform:uppercase;}
+.result-total-val{font-family:'Cinzel',serif;font-size:1.4rem;color:var(--gold2);}
+.decider-msg{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:0.85rem;color:var(--dim);text-align:center;}
+/* round history */
+#round-hist{width:100%;max-width:340px;display:flex;flex-direction:column;gap:2px;max-height:100px;overflow-y:auto;}
+.hist-row{display:flex;justify-content:space-between;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,0.04);font-family:'Cinzel',serif;font-size:0.42rem;color:var(--dim);}
+.hist-row .hw{color:var(--gold);}
+
+/* ── GAME OVER ── */
+#gameover-screen{gap:16px;text-align:center;}
+.go-msg{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.2rem;color:var(--text);}
+.go-score{font-family:'Cinzel',serif;font-size:1.6rem;color:var(--gold2);}
+
+/* ── DEAL ANIMATION OVERLAY ── */
+#deal-anim{position:fixed;inset:0;pointer-events:none;z-index:50;}
+.anim-card{
+  position:absolute;
+  width:46px;height:66px;border-radius:6px;
+  background:linear-gradient(145deg,#1a3670,#1e3f80);
+  border:1px solid rgba(255,255,255,0.15);
+  box-shadow:2px 4px 10px rgba(0,0,0,0.6);
+  opacity:0;
+  will-change:transform,opacity;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+  transition:transform 0.35s cubic-bezier(.25,.85,.35,1),opacity 0.18s ease;
+}
+.anim-card.fly{opacity:1;}
+.anim-card.land{opacity:0;transition:opacity 0.14s ease 0.3s;}
+/* ── WAITING ROOM SEATS ── */
+.wait-seat{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(212,168,67,0.15);
+  border-radius:10px;padding:8px 10px;
+}
+.wait-seat.filled{border-color:rgba(212,168,67,0.3);background:rgba(212,168,67,0.06);}
+.wait-seat.mine{border-color:var(--gold);background:rgba(212,168,67,0.1);}
+.ws-avatar{
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(212,168,67,0.15);border:1px solid rgba(212,168,67,0.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;flex-shrink:0;
+}
+.ws-name{
+  font-family:'Cinzel',serif;font-size:0.62rem;
+  letter-spacing:0.06em;color:var(--gold);font-weight:600;
+}
+.ws-team{
+  font-family:'Cormorant Garamond',serif;font-size:0.7rem;
+  color:var(--dim);font-style:italic;
+}
+.ws-empty .ws-name{color:var(--faint);}
+
+</style>
+</head>
+<body>
+
+<!-- DEAL ANIMATION OVERLAY -->
+<div id="deal-anim"></div>
+
+<!-- START SCREEN -->
+<div class="screen" id="start-screen">
+  <div class="game-title">DOL</div>
+  <div class="game-sub">Collect the Tens · Claim the Houses</div>
+  <div class="start-btns">
+    <button class="btn" onclick="goToDraw()">Play vs Bots</button>
+    <button class="btn-ghost" onclick="goToMultiplayer()">Play Online</button>
+    <button class="btn-ghost" onclick="goToInfo()">How to Play</button>
+  </div>
+</div>
+
+<!-- HOW TO PLAY -->
+<div class="screen hidden" id="info-screen" style="gap:12px;overflow-y:auto;align-items:flex-start;padding:32px 20px;">
+  <div class="screen-title" style="align-self:center;">How to Play Dol</div>
+  <div style="font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--text);line-height:1.7;max-width:400px;margin:0 auto;">
+    <p><strong style="color:var(--gold)">Goal:</strong> First team to 21 points wins.</p><br>
+    <p><strong style="color:var(--gold)">Teams:</strong> You & Ally vs Opp Left & Opp Right.</p><br>
+    <p><strong style="color:var(--gold)">Dol vs Inn:</strong> A trick with a 10 is a Dol. Without a 10 it's an Inn.</p><br>
+    <p><strong style="color:var(--gold)">Scoring:</strong> 4 tens = 5pts · 3 tens = 4pts/1pt · 2 each = 3pts/2pts by Inn count.</p><br>
+    <p><strong style="color:var(--gold)">Rules:</strong> Follow the lead suit. If void, play anything — including trump. Trump beats all other suits.</p>
+  </div>
+  <button class="btn" onclick="showScreen('start-screen')" style="align-self:center;margin-top:8px;">Back</button>
+</div>
+
+<!-- DRAW SCREEN -->
+<div class="screen hidden" id="draw-screen">
+  <div class="screen-title">Draw for Trump Decider</div>
+  <div class="screen-sub">Highest card picks the trump suit</div>
+  <!-- Draw cards in one neat row: You · Ally · Opp Left · Opp Right -->
+  <div class="draw-grid" id="draw-grid">
+    <div class="draw-slot you-slot" id="draw-you-slot">
+      <div class="draw-label you-label">You</div>
+      <div class="draw-card" id="dc-0" onclick="flipYou()">
+        <div class="card-back"><span class="tap-to-flip">Tap</span></div>
+        <div class="card-front" id="df-0"></div>
+      </div>
+    </div>
+    <div class="draw-slot" id="draw-ally-slot">
+      <div class="draw-label">Ally</div>
+      <div class="draw-card" id="dc-1">
+        <div class="card-back"></div>
+        <div class="card-front" id="df-1"></div>
+      </div>
+    </div>
+    <div class="draw-slot" id="draw-oppl-slot">
+      <div class="draw-label">Opp L</div>
+      <div class="draw-card" id="dc-2">
+        <div class="card-back"></div>
+        <div class="card-front" id="df-2"></div>
+      </div>
+    </div>
+    <div class="draw-slot" id="draw-oppr-slot">
+      <div class="draw-label">Opp R</div>
+      <div class="draw-card" id="dc-3">
+        <div class="card-back"></div>
+        <div class="card-front" id="df-3"></div>
+      </div>
+    </div>
+  </div>
+  <div id="draw-result"></div>
+  <button class="btn hidden" id="draw-continue" onclick="afterDraw()">Continue →</button>
+</div>
+
+<!-- TRUMP PICK SCREEN -->
+<div class="screen hidden" id="trump-screen">
+  <div class="screen-title">Choose Trump Suit</div>
+  <div class="screen-sub">You have 5 cards — pick trump for this round</div>
+  <div id="trump-hand-row" style="display:flex;justify-content:center;gap:-6px;margin:8px 0;"></div>
+  <div class="suit-buttons">
+    <button class="suit-btn red-suit" onclick="pickTrump('♥','Hearts')"><span class="suit-sym">♥</span><span class="suit-name">Hearts</span></button>
+    <button class="suit-btn blk-suit" onclick="pickTrump('♠','Spades')"><span class="suit-sym">♠</span><span class="suit-name">Spades</span></button>
+    <button class="suit-btn red-suit" onclick="pickTrump('♦','Diamonds')"><span class="suit-sym">♦</span><span class="suit-name">Diamonds</span></button>
+    <button class="suit-btn blk-suit" onclick="pickTrump('♣','Clubs')"><span class="suit-sym">♣</span><span class="suit-name">Clubs</span></button>
+  </div>
+</div>
+
+<!-- GAME UI -->
+<div id="game">
+  <!-- Top bar -->
+  <div id="topbar">
+    <div class="team-score">
+      <div class="team-lbl">Their Team</div>
+      <div class="team-val" id="sc-t">0</div>
+    </div>
+    <div id="trump-display">
+      <div class="trump-lbl">Trump</div>
+      <div class="trump-val">
+        <span class="trump-sym" id="trump-sym">?</span>
+        <span class="trump-name" id="trump-name">—</span>
+      </div>
+    </div>
+    <div class="team-score">
+      <div class="team-lbl">Your Team</div>
+      <div class="team-val ours" id="sc-y">0</div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div id="table-area">
+    <!-- Opponents -->
+    <div id="opponents">
+      <!-- Opp Left -->
+      <div class="opp-slot" id="slot-l">
+        <div class="opp-av" id="av-l">♦</div>
+        <div class="opp-name">Opp Left</div>
+        <div class="opp-badges">
+          <span class="badge d-badge" id="db-l">0✦</span>
+          <span class="badge i-badge" id="ib-l">0</span>
+        </div>
+        <div class="bot-cards" id="bc-l"></div>
+      </div>
+      <!-- Ally (centre top) -->
+      <div class="opp-slot ally-slot" id="slot-t">
+        <div class="opp-av ally-av" id="av-t">♣</div>
+        <div class="opp-name">Ally</div>
+        <div class="opp-badges">
+          <span class="badge d-badge" id="db-t">0✦</span>
+          <span class="badge i-badge" id="ib-t">0</span>
+        </div>
+        <div class="bot-cards" id="bc-t"></div>
+      </div>
+      <!-- Opp Right -->
+      <div class="opp-slot" id="slot-r">
+        <div class="opp-av" id="av-r">♥</div>
+        <div class="opp-name">Opp Right</div>
+        <div class="opp-badges">
+          <span class="badge d-badge" id="db-r">0✦</span>
+          <span class="badge i-badge" id="ib-r">0</span>
+        </div>
+        <div class="bot-cards" id="bc-r"></div>
+      </div>
+    </div>
+
+    <!-- Play area -->
+    <div id="play-area"></div>
+
+    <!-- Status -->
+    <div id="status-bar">Your turn</div>
+  </div>
+
+  <!-- Bottom panel -->
+  <div id="bottom-panel">
+    <div id="your-info">
+      <div class="you-badges">
+        <span class="you-lbl">You & Ally</span>
+        <span class="badge d-badge" id="db-y">0✦</span>
+        <span class="badge i-badge" id="ib-y">0</span>
+      </div>
+      <div id="round-info">Round 1</div>
+    </div>
+    <div id="hand-area"></div>
+  </div>
+</div>
+
+<!-- RESULT SCREEN -->
+<div class="screen hidden" id="result-screen">
+  <div class="screen-title" id="result-title">Round 1 Over</div>
+  <div class="result-card-box">
+    <div class="result-teams">
+      <div class="rt-blk ours">
+        <div class="rt-lbl">You & Ally</div>
+        <div class="rt-suits" id="rt-your-suits"></div>
+        <div class="rt-detail" id="rt-your-detail"></div>
+        <div class="rt-pts" id="rt-your-pts">0</div>
+        <div class="rt-pts-lbl">points</div>
+      </div>
+      <div class="rt-blk theirs">
+        <div class="rt-lbl">Their Team</div>
+        <div class="rt-suits" id="rt-their-suits"></div>
+        <div class="rt-detail" id="rt-their-detail"></div>
+        <div class="rt-pts loss" id="rt-their-pts">0</div>
+        <div class="rt-pts-lbl">points</div>
+      </div>
+    </div>
+    <div class="result-div"></div>
+    <div class="result-total">
+      <div class="result-total-lbl">Total Score</div>
+      <div class="result-total-val" id="rt-total">0 — 0</div>
+    </div>
+  </div>
+  <div class="decider-msg" id="decider-msg"></div>
+  <div id="round-hist"></div>
+  <button class="btn" onclick="nextRound()">Next Round</button>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div class="screen hidden" id="gameover-screen">
+  <div class="game-title" style="font-size:clamp(2rem,10vw,3.5rem);">DOL</div>
+  <div class="go-msg" id="go-msg">Game Over</div>
+  <div class="go-score" id="go-score"></div>
+  <button class="btn" onclick="location.reload()">Play Again</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+
+// ══════════════════════════════════════════
+//  DOL CARD GAME — MOBILE
+//  Rules: 4p 2v2, CCW turns (0→3→1→2)
+//  Dol=trick with ≥1 ten, Inn=trick without
+//  Score: 4tens=5, 3tens=4/1, 2-2 by Inns
+//  First to 21 wins
+// ══════════════════════════════════════════
+
+const SUITS=['♠','♥','♦','♣'];
+const SNAMES={'♠':'Spades','♥':'Hearts','♦':'Diamonds','♣':'Clubs'};
+const RV={'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
+const ORDER=[0,3,1,2]; // CCW
+const TEAMMATE={0:1,1:0,2:3,3:2};
+const RIGHTOPP={0:3,1:2,2:0,3:1};
+const LEFTOPP={0:2,1:3,2:1,3:0};
+const PNAMES=['You','Ally','Opp Left','Opp Right'];
+const IS_RED=s=>s==='♥'||s==='♦';
+
+let G={},drawCards=[],flipped=0,drawPlayers=[0,1,2,3],botTimer=null,tZ=1;
+
+// ── Safe DOM helpers ──
+const $=id=>document.getElementById(id);
+function setText(id,v){const e=$(id);if(e)e.textContent=v;}
+function setHTML(id,v){const e=$(id);if(e)e.innerHTML=v;}
+function toggleCls(id,cls,v){const e=$(id);if(e)e.classList.toggle(cls,v);}
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  const s=$(id);if(s)s.classList.remove('hidden');
+}
+function sched(fn,ms){if(botTimer)clearTimeout(botTimer);botTimer=setTimeout(()=>{botTimer=null;fn();},ms);}
+
+// ── Card helpers ──
+function newDeck(){
+  const d=[];
+  for(const s of SUITS)for(const r of Object.keys(RV))d.push({suit:s,rank:r});
+  for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]];}
+  return d;
+}
+function sort(h){return [...h].sort((a,b)=>{const sd=SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit);return sd||RV[b.rank]-RV[a.rank];});}
+function isTrump(c){return c.suit===G.trump;}
+function isRed(c){return IS_RED(c.suit);}
+function rv(r){return RV[r]||0;}
+function cc(c){return isRed(c)?'red-card':'blk-card';}
+
+function cardFaceHTML(card,small=false){
+  const col=IS_RED(card.suit)?'#c0151a':'#0a0806';
+  const fsz=small?'0.65rem':'';
+  const rankSz=fsz?`font-size:${fsz};`:'';
+  const suitSmSz=fsz?`font-size:${fsz};`:'';
+  const suitLgSz=fsz?`font-size:${fsz};`:'';
+  return `<div class="cf-corner tl"><div class="cf-rank" style="color:${col};${rankSz}">${card.rank}</div><div class="cf-suit-sm" style="color:${col};${suitSmSz}">${card.suit}</div></div>
+  <div class="cf-suit-lg" style="color:${col};${suitLgSz}">${card.suit}</div>
+  <div class="cf-corner br"><div class="cf-rank" style="color:${col};${rankSz}">${card.rank}</div><div class="cf-suit-sm" style="color:${col};${suitSmSz}">${card.suit}</div></div>`;
+}
+
+function drawCardFaceHTML(card){
+  const col=IS_RED(card.suit)?'#c0151a':'#0a0806';
+  return `<div class="cf-corner tl" style="top:5px;left:6px;"><div class="cf-rank" style="color:${col}">${card.rank}</div><div class="cf-suit-sm" style="color:${col}">${card.suit}</div></div>
+  <div class="cf-suit-lg" style="color:${col}">${card.suit}</div>
+  <div class="cf-corner br" style="bottom:5px;right:6px;transform:rotate(180deg);"><div class="cf-rank" style="color:${col}">${card.rank}</div><div class="cf-suit-sm" style="color:${col}">${card.suit}</div></div>`;
+}
+
+// ── SCREENS ──
+function goToInfo(){showScreen('info-screen');}
+function goToDraw(){
+  drawCards=[];flipped=0;drawPlayers=[0,1,2,3];
+  const deck=newDeck();
+  for(let i=0;i<4;i++)drawCards[i]=deck[i];
+  // Lay out draw grid — 4 slots
+  $('draw-oppr-slot').style.display='flex';
+  $('draw-you-slot').style.gridColumn='1/-1';
+  // Set card fronts
+  for(let i=1;i<4;i++){
+    const cf=$('df-'+i);
+    if(cf){cf.className=`card-front ${cc(drawCards[i].suit)}`;cf.innerHTML=drawCardFaceHTML(drawCards[i]);}
+  }
+  $('draw-result').textContent='';
+  $('draw-continue').classList.add('hidden');
+  showScreen('draw-screen');
+  // Flip bots after short delay
+  [1,2,3].forEach((p,i)=>setTimeout(()=>flipBot(p),(i+1)*600));
+}
+
+function flipBot(p){
+  const el=$('dc-'+p);
+  if(el)el.classList.add('revealed');
+  flipped++;
+  if(flipped>=drawPlayers.length)setTimeout(revealWinner,500);
+}
+
+function flipYou(){
+  const el=$('dc-0');
+  if(!el||el.classList.contains('revealed'))return;
+  const cf=$('df-0');
+  if(cf){cf.className=`card-front ${cc(drawCards[0].suit)}`;cf.innerHTML=drawCardFaceHTML(drawCards[0]);}
+  el.classList.add('revealed');
+  flipped++;
+  if(flipped>=drawPlayers.length)setTimeout(revealWinner,500);
+}
+
+function revealWinner(){
+  const maxV=Math.max(...drawPlayers.map(p=>rv(drawCards[p].rank)));
+  const tied=drawPlayers.filter(p=>rv(drawCards[p].rank)===maxV);
+  if(tied.length>1){
+    $('draw-result').textContent=`Tie between ${tied.map(p=>PNAMES[p]).join(' & ')} — redrawing!`;
+    setTimeout(()=>redrawTied(tied),1400);
+    return;
+  }
+  const w=tied[0];
+  $('dc-'+w).style.boxShadow='0 0 24px rgba(212,168,67,0.9)';
+  const msg=w===0?`You drew ${drawCards[0].rank}${drawCards[0].suit} — you pick trump!`:`${PNAMES[w]} drew ${drawCards[w].rank}${drawCards[w].suit} — they pick trump`;
+  $('draw-result').textContent=msg;
+  $('draw-continue').classList.remove('hidden');
+  G.trumpDecider=w;
+}
+
+function redrawTied(tied){
+  const deck=newDeck();
+  tied.forEach(p=>{drawCards[p]=deck.pop();});
+  $('draw-result').textContent='';
+  flipped=0;drawPlayers=tied;
+  tied.forEach(p=>{
+    const el=$('dc-'+p);if(el)el.classList.remove('revealed');
+    const cf=$('df-'+p);if(cf){cf.innerHTML='';cf.className='card-front';}
+  });
+  const bots=tied.filter(p=>p!==0);
+  bots.forEach((p,i)=>setTimeout(()=>flipBot(p),(i+1)*600));
+  if(!tied.includes(0))setTimeout(revealWinner,(bots.length+1)*600);
+}
+
+function afterDraw(){
+  G.yourScore=0;G.theirScore=0;G.round=1;G.roundHistory=[];
+  initRound();
+}
+
+// ══════════════ ROUND LOGIC ══════════════
+function initRound(){
+  const deck=newDeck();
+  G.deck=deck;
+  G.hands=[[],[],[],[]];
+  G.trick=[];G.leadSuit=null;
+  G.currentPlayer=G.trumpDecider;
+  G.yourDols=0;G.theirDols=0;G.yourInns=0;G.theirInns=0;
+  G.yourTens=0;G.theirTens=0;
+  G.yourDolSuits=[];G.theirDolSuits=[];
+  G.voidTracker={};G.discardTracker={};
+  G.tricks=0;G.awaiting=false;G.trump=null;
+  G.playedCards=[];G.tensOut=0;
+  G.voidTracker={};
+  if(!Array.isArray(G.roundHistory))G.roundHistory=[];
+  // Deal 5 each
+  for(let p=0;p<4;p++)for(let i=0;i<5;i++)G.hands[p].push(deck.pop());
+  // Show game UI
+  $('game').classList.add('active');
+  showScreen(null); // hide all screens
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  updateTrumpDisplay();
+  updateUI();
+  renderBots();
+  // Animate first deal
+  animateDeal(5,()=>{
+    G.hands[0]=sort(G.hands[0]);
+    renderHand();
+    if(G.trumpDecider===0){
+      showTrumpPicker();
+    } else {
+      setStatus(`${PNAMES[G.trumpDecider]} is choosing trump...`,false);
+      setTimeout(()=>{G.trump=botPickTrump(G.trumpDecider);finishDeal();},1200);
+    }
+  });
+}
+
+function botPickTrump(p){
+  const h=G.hands[p];
+  const scores={};
+  for(const s of SUITS){
+    const cnt=h.filter(c=>c.suit===s&&c.rank!=='10').length;
+    const face=h.filter(c=>c.suit===s&&rv(c.rank)>=11).length*2;
+    scores[s]=cnt+face;
+  }
+  return Object.entries(scores).reduce((a,b)=>b[1]>a[1]?b:a)[0];
+}
+
+function showTrumpPicker(){
+  // Show hand preview
+  const row=$('trump-hand-row');
+  if(row){
+    row.innerHTML='';
+    const h=sort(G.hands[0]);
+    h.forEach((card,i)=>{
+      const el=document.createElement('div');
+      el.className=`hand-card ${cc(card)} ${isTrump(card)?'is-trump':''}`;
+      el.style.width='44px';el.style.height='64px';
+      el.style.marginLeft=i===0?'0':'-14px';
+      el.innerHTML=cardFaceHTML(card,true);
+      row.appendChild(el);
+    });
+  }
+  // Show trump screen on top of game — don't hide game
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  $('trump-screen').classList.remove('hidden');
+  document.getElementById('game').classList.add('active');
+}
+
+function pickTrump(suit,name){
+  G.trump=suit;
+  // Hide all screens (including trump-screen)
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  // Ensure game UI is visible
+  document.getElementById('game').classList.add('active');
+  finishDeal();
+}
+
+function finishDeal(){
+  updateTrumpDisplay();
+  // Deal 4+4 more
+  for(let p=0;p<4;p++)for(let i=0;i<4;i++)G.hands[p].push(G.deck.pop());
+  for(let p=0;p<4;p++)for(let i=0;i<4;i++)G.hands[p].push(G.deck.pop());
+  G.hands[0]=sort(G.hands[0]);
+  animateDeal(8,()=>{
+    renderBots();renderHand();startRound();
+  });
+}
+
+function updateTrumpDisplay(){
+  const sym=$('trump-sym'),name=$('trump-name');
+  if(sym)sym.textContent=G.trump||'?';
+  if(name)name.textContent=G.trump?SNAMES[G.trump]:'—';
+  if(sym&&G.trump)sym.style.color=IS_RED(G.trump)?'var(--red)':'var(--text)';
+}
+
+function startRound(){
+  setText('round-info',`Round ${G.round}`);
+  updateUI();renderBots();renderHand();
+  updateTrumpStar();
+  G.awaiting=G.currentPlayer===0;
+  if(G.currentPlayer===0){setStatus('Your turn — lead the first card',true);renderHand();}
+  else{setStatus(`${PNAMES[G.currentPlayer]} leads...`,false);sched(botPlay,1400);}
+}
+
+// ── DEAL ANIMATION ──
+function animateDeal(count,cb){
+  const overlay=$('deal-anim');
+  overlay.innerHTML='';
+  // Destination positions (centre of each player's area)
+  const W=window.innerWidth,H=window.innerHeight;
+  const DEST=[
+    {x:W/2-23,y:H-100},      // You (bottom)
+    {x:W/2-23,y:90},          // Ally (top centre)
+    {x:40,y:H/2-80},          // Opp Left
+    {x:W-86,y:H/2-80},        // Opp Right
+  ];
+  const SRC={x:W/2-23,y:H/2-33};
+  const seq=[];
+  const passSize=count===5?5:4;
+  const passes=count===5?1:2;
+  for(let pa=0;pa<passes;pa++)for(let oi=0;oi<4;oi++)for(let c=0;c<(count===5?5:4);c++)seq.push(ORDER[oi]);
+  // deduplicate to just count cards per player — simplified: animate count cards per player
+  const simpleSeq=[];
+  for(let c=0;c<count;c++)for(let oi=0;oi<4;oi++)simpleSeq.push(ORDER[oi]);
+  let i=0;
+  function next(){
+    if(i>=simpleSeq.length){setTimeout(()=>{overlay.innerHTML='';cb();},200);return;}
+    const p=simpleSeq[i++];
+    const d=DEST[p];
+    const el=document.createElement('div');
+    el.className='anim-card';
+    el.style.left=SRC.x+'px';el.style.top=SRC.y+'px';
+    overlay.appendChild(el);
+    requestAnimationFrame(()=>{
+      el.classList.add('fly');
+      el.style.transform=`translate(${d.x-SRC.x}px,${d.y-SRC.y}px)`;
+      setTimeout(()=>el.classList.add('land'),260);
+      setTimeout(next,85);
+    });
+  }
+  next();
+}
+
+// ── RENDER ──
+function renderHand(){
+  const h=G.hands[0];
+  const area=$('hand-area');
+  if(!area)return;
+  area.innerHTML='';
+  const playable=new Set(getPlayable());
+  const cw=60;  // card width
+  const pad=12; // horizontal padding total
+  const W=window.innerWidth-pad;
+  const totalW=h.length*cw;
+  // Overlap so all cards always fit within screen width
+  const ov=h.length>1?Math.max(0,Math.ceil((totalW-W)/(h.length-1))):0;
+  h.forEach((card,i)=>{
+    const can=playable.has(i)&&G.currentPlayer===0&&G.awaiting;
+    const el=document.createElement('div');
+    el.className=`hand-card ${cc(card)} ${isTrump(card)?'is-trump':''} ${can?'':'unplayable'}`;
+    el.style.marginLeft=i===0?'0':`-${ov}px`;
+    el.innerHTML=cardFaceHTML(card);
+    if(can)el.onclick=()=>play(0,i);
+    area.appendChild(el);
+  });
+}
+
+function getPlayable(){
+  const h=G.hands[0];
+  if(!G.leadSuit)return h.map((_,i)=>i);
+  const f=h.map((c,i)=>c.suit===G.leadSuit?i:-1).filter(i=>i>=0);
+  return f.length>0?f:h.map((_,i)=>i);
+}
+
+function renderBots(){
+  [{id:'bc-t',p:1},{id:'bc-l',p:2},{id:'bc-r',p:3}].forEach(({id,p})=>{
+    const el=$(id);if(!el)return;
+    el.innerHTML='';
+    const cnt=G.hands[p]?G.hands[p].length:0;
+    for(let i=0;i<cnt;i++){const d=document.createElement('div');d.className='bot-card';el.appendChild(d);}
+  });
+}
+
+// Fan positions for played cards
+// Fan offsets — each player's card fans outward from centre
+// You=bottom, Ally=top, OppLeft=left, OppRight=right
+const FAN=[
+  {x:'0px',  y:'38px',  r:'-4deg'},  // You — shifts down
+  {x:'0px',  y:'-38px', r:'4deg'},   // Ally — shifts up
+  {x:'-42px',y:'-8px',  r:'-8deg'},  // OppLeft — shifts left
+  {x:'42px', y:'-8px',  r:'8deg'},   // OppRight — shifts right
+];
+function renderPlayedCard(player,card,winner=false){
+  const area=$('play-area');if(!area)return;
+  const old=area.querySelector(`[data-p="${player}"]`);if(old)old.remove();
+  const el=document.createElement('div');
+  el.className=`played-card ${cc(card)} ${winner?'win-card':''}`;
+  el.dataset.p=player;
+  const f=FAN[player];
+  // Position at centre of play area, then fan outward
+  const cardW=54,cardH=78;
+  el.style.cssText=`
+    top:calc(50% - ${cardH/2}px);
+    left:calc(50% - ${cardW/2}px);
+    z-index:${tZ++};
+    transform:translateX(${f.x}) translateY(${f.y}) rotate(${f.r});
+  `.replace(/\s+/g,' ');
+  el.innerHTML=cardFaceHTML(card,false);
+  area.appendChild(el);
+}
+
+function clearPlayArea(){const a=$('play-area');if(a)a.innerHTML='';tZ=1;}
+
+function dolSuitsHTML(suits){
+  if(!suits||!suits.length)return'<span style="opacity:0.35">—</span>';
+  return suits.map(s=>`<span style="${IS_RED(s)?'color:var(--red)':'color:var(--ink);filter:invert(1) brightness(2)'}">${s}</span>`).join('');
+}
+
+function updateUI(){
+  const yd=G.yourDols||0,yi=G.yourInns||0,td=G.theirDols||0,ti=G.theirInns||0;
+  const yt=G.yourTens||0,tt=G.theirTens||0;
+  // Badges
+  const yBadge=`${yt}✦ ${dolSuitsHTML(G.yourDolSuits||[])}`;
+  const tBadge=`${tt}✦ ${dolSuitsHTML(G.theirDolSuits||[])}`;
+  setHTML('db-y',yBadge); toggleCls('db-y','lit',yd>0);
+  setHTML('db-t',yBadge); toggleCls('db-t','lit',yd>0);
+  setHTML('db-l',tBadge); toggleCls('db-l','lit',td>0);
+  setHTML('db-r',tBadge); toggleCls('db-r','lit',td>0);
+  setText('ib-y',yi+' Inn'); toggleCls('ib-y','lit',yi>0);
+  setText('ib-t',yi+' Inn');
+  setText('ib-l',ti+' Inn'); toggleCls('ib-l','lit',ti>0);
+  setText('ib-r',ti+' Inn');
+  setText('sc-y',G.yourScore||0);
+  setText('sc-t',G.theirScore||0);
+  // Active player highlight
+  const pmap={t:1,l:2,r:3};
+  ['t','l','r'].forEach(k=>{
+    const av=$('av-'+k);
+    if(av)av.classList.toggle('active-av',pmap[k]===G.currentPlayer);
+  });
+}
+
+function updateTrumpStar(){
+  ['t','l','r'].forEach(k=>{
+    const av=$('av-'+k);if(!av)return;
+    const old=av.querySelector('.trump-star');if(old)old.remove();
+  });
+  const pmap={1:'t',2:'l',3:'r'};
+  if(pmap[G.trumpDecider]){
+    const av=$('av-'+pmap[G.trumpDecider]);
+    if(av){const star=document.createElement('div');star.className='trump-star';star.textContent='★';av.appendChild(star);}
+  }
+}
+
+function setStatus(msg,yourTurn){
+  const el=$('status-bar');if(!el)return;
+  el.textContent=msg;
+  el.classList.toggle('your-turn',yourTurn);
+}
+
+// ── GAME LOGIC ──
+function cmp(a,b,ls){
+  const at=a.suit===G.trump,bt=b.suit===G.trump,al=a.suit===ls,bl=b.suit===ls;
+  if(at&&bt)return rv(a.rank)-rv(b.rank);if(at)return 1;if(bt)return -1;
+  if(al&&bl)return rv(a.rank)-rv(b.rank);if(al)return 1;if(bl)return -1;
+  return 0;
+}
+function trickWinner(played,ls){
+  // Unified: works with explicit played map OR falls back to G.trick
+  if(played){
+    const ps=Object.keys(played).map(Number);let best=ps[0];
+    for(let i=1;i<ps.length;i++){if(cmp(played[ps[i]].card,played[best].card,ls||G.leadSuit)>0)best=ps[i];}
+    return G.trick.findIndex(t=>t.player===best);
+  }
+  let best=0;
+  for(let i=1;i<G.trick.length;i++)if(cmp(G.trick[i].card,G.trick[best].card,G.leadSuit)>0)best=i;
+  return best;
+}
+
+function play(player,idx){
+  if(player===0&&!G.awaiting)return;
+  if(botTimer){clearTimeout(botTimer);botTimer=null;}
+  const card=G.hands[player][idx];
+  G.hands[player].splice(idx,1);
+  if(G.trick.length===0)G.leadSuit=card.suit;
+  G.trick.push({player,card});
+  renderPlayedCard(player,card);
+  if(player===0){G.awaiting=false;renderHand();}
+  renderBots();
+  if(G.trick.length===4){setTimeout(resolve,900);}
+  else{
+    const i=ORDER.indexOf(player);
+    G.currentPlayer=ORDER[(i+1)%4];
+    updateUI();
+    if(G.currentPlayer===0){G.awaiting=true;setStatus('Your turn — play a card',true);renderHand();}
+    else{setStatus(`${PNAMES[G.currentPlayer]} is thinking...`,false);sched(botPlay,1400);}
+  }
+}
+
+function resolve(){
+  const tm=Object.fromEntries(G.trick.map(t=>[t.player,t]));
+  const wi=trickWinner(tm,G.leadSuit);
+  const winner=G.trick[wi].player;
+  const tens=G.trick.filter(t=>t.card.rank==='10').length;
+  const yt=winner===0||winner===1;
+  renderPlayedCard(winner,tm[winner].card,true);
+  if(yt){
+    if(tens>0){
+      G.yourDols++;             // 1 stack = 1 Dol regardless of how many 10s in it
+      G.yourTens+=tens;         // track individual 10s for scoring
+      // Store ALL ten suits won (multiple per stack possible)
+      G.trick.filter(t=>t.card.rank==='10').forEach(t=>G.yourDolSuits.push(t.card.suit));
+    } else G.yourInns++;
+  } else {
+    if(tens>0){
+      G.theirDols++;
+      G.theirTens+=tens;
+      G.trick.filter(t=>t.card.rank==='10').forEach(t=>G.theirDolSuits.push(t.card.suit));
+    } else G.theirInns++;
+  }
+  // Record played cards + update void tracker (detect who couldn't follow suit)
+  if(!G.voidTracker)G.voidTracker={};
+  G.trick.forEach(t=>{
+    G.playedCards.push(t.card);
+    if(t.card.rank==='10')G.tensOut++;
+    if(G.leadSuit&&t.card.suit!==G.leadSuit){
+      recordVoid(t.player,G.leadSuit);
+      // Track discards (off-suit, non-trump plays = discards)
+      if(t.card.suit!==G.trump)recordDiscard(t.player,t.card);
+    }
+  });
+  G.tricks++;updateUI();
+  const trickLabel=tens>1?`Dol ✦✦ (${tens} tens!)`:tens===1?'Dol ✦':'Inn';
+  setStatus(`${PNAMES[winner]} wins the ${trickLabel}!`,false);
+  if(G.tricks===13){setTimeout(endRound,1400);return;}
+  setTimeout(()=>{
+    clearPlayArea();trickZ=1;
+    G.trick=[];G.leadSuit=null;G.currentPlayer=winner;updateUI();
+    if(winner===0){G.awaiting=true;setStatus('You won — lead the next trick',true);renderHand();}
+    else{setStatus(`${PNAMES[winner]} leads...`,false);sched(botPlay,1800);}
+  },2000);
+}
+
+function endRound(){
+  const yd=G.yourDols,td=G.theirDols,yi=G.yourInns,ti=G.theirInns;
+  const yt10=G.yourTens,tt10=G.theirTens; // individual 10s for scoring
+  let yp=0,tp=0;
+  if(yt10>=4){yp=5;}else if(tt10>=4){tp=5;}
+  else if(yt10===3){yp=4;tp=1;}else if(tt10===3){tp=4;yp=1;}
+  else{if(yi>=ti){yp=3;tp=2;}else{tp=3;yp=2;}}
+  G.yourScore+=yp;G.theirScore+=tp;
+
+  // Trump Decider transition — clean lookup table approach
+  const prev=G.trumpDecider;
+  const deciderYours=prev===0||prev===1;
+  const yourWon=yt10>tt10||(yt10===2&&tt10===2&&yi>=ti);
+  const trumpTeamWon=deciderYours?yourWon:!yourWon;
+  const dolsWon=deciderYours?yt10:tt10;
+  if(trumpTeamWon){
+    if(dolsWon===4)G.trumpDecider=TEAMMATE[prev]; // all 4 → teammate
+    // else 1-3 → same decider, no change
+  } else {
+    const oppDols=deciderYours?td:yd;
+    if(oppDols===4)G.trumpDecider=LEFTOPP[prev];  // all 4 → left opp
+    else G.trumpDecider=RIGHTOPP[prev];            // 1-3 → right opp
+  }
+
+  // Save round to history
+  G.roundHistory.push({round:G.round,yd,td,yi,ti,yp,tp,prevDecider:prev,newDecider:G.trumpDecider});
+  setText('result-title',`Round ${G.round} Over`);
+  // Build dol suit displays
+  const suitColor=s=>(s==='♥'||s==='♦')?`<span class="rt-dol-suit" style="color:var(--red)">${s}</span>`:`<span class="rt-dol-suit" style="color:var(--ink);filter:invert(1) brightness(2)">${s}</span>`;
+  const yourSuitsHTML=G.yourDolSuits.length>0?G.yourDolSuits.map(s=>`<span style="font-size:1.3rem;${(s==='♥'||s==='♦')?'color:var(--red)':'color:#ccc'}">${s}</span>`).join(''):'<span style="color:var(--text-faint);font-size:0.8rem">No Dols</span>';
+  const theirSuitsHTML=G.theirDolSuits.length>0?G.theirDolSuits.map(s=>`<span style="font-size:1.3rem;${(s==='♥'||s==='♦')?'color:var(--red)':'color:#ccc'}">${s}</span>`).join(''):'<span style="color:var(--text-faint);font-size:0.8rem">No Dols</span>';
+  // Show suit symbols for each individual ten won; label clearly as tens not stacks
+  setHTML('rt-your-suits',yourSuitsHTML);
+  setHTML('rt-their-suits',theirSuitsHTML);
+  // Inn count = stacks without a ten (always sums with Dol stacks to 13)
+  setText('rt-your-detail',`${yt10} ten${yt10!==1?'s':''} won · ${yi} Inn${yi!==1?'s':''}`);
+  setText('rt-their-detail',`${tt10} ten${tt10!==1?'s':''} won · ${ti} Inn${ti!==1?'s':''}`);
+  setText('rt-your-pts',`+${yp}`);
+  setText('rt-their-pts',`+${tp}`);
+  const _yp=$('rt-your-pts');if(_yp)_yp.className=`rt-pts${yp>=tp?'':' loss'}`;
+  const _tp=$('rt-their-pts');if(_tp)_tp.className=`rt-pts${tp>yp?'':' loss'}`;
+  setText('rt-total',`${G.yourScore} — ${G.theirScore}`);
+  // Trump decider change message (use module-level PNAMES to avoid conflicts)
+  let deciderMsg='';
+  if(G.trumpDecider===prev){
+    deciderMsg=`${PNAMES[prev]} keeps the Trump Decider role`;
+  } else {
+    deciderMsg=`Trump Decider passes to ${PNAMES[G.trumpDecider]}`;
+  }
+  setText('decider-msg',deciderMsg);
+
+  // Round history
+  const histEl=$('round-hist');
+  histEl.innerHTML='';
+  G.roundHistory.forEach(r=>{
+    const won=r.yp>r.tp?'Your team':r.tp>r.yp?'Their team':'Tied';
+    const row=document.createElement('div');row.className='rh-row';
+    row.innerHTML=`<span class="rh-r">Round ${r.round}</span>
+      <span>Your: ${r.yd} Dol${r.yd!==1?'s':''} / Their: ${r.td} Dol${r.td!==1?'s':''}</span>
+      <span class="rh-s">${r.yp}–${r.tp}</span>
+      <span class="rh-w">${r.yp>r.tp?'▲':''}${r.tp>r.yp?'▼':''}</span>`;
+    histEl.appendChild(row);
+  });
+
+  // Dealer info
+  const dealerPlayer=LEFTOPP[G.trumpDecider];
+  setText('round-info',`Round ${G.round+1} · Dealer: ${PNAMES[dealerPlayer]||'?'}`);
+
+  showScreen('result-screen');
+  if(G.yourScore>=21||G.theirScore>=21){
+    setTimeout(()=>{
+      document.getElementById('result-screen').classList.add('hidden');
+      document.getElementById('go-msg').textContent=(G.yourScore>=G.theirScore?'Your team wins! ':'Their team wins! ')+`Final: ${G.yourScore} – ${G.theirScore}`;
+      showScreen('gameover-screen');
+    },200);
+  }
+}
+
+function nextRoundSP(){
+  try{
+    document.getElementById('result-screen').classList.add('hidden');
+    // Ensure critical state exists before proceeding
+    if(typeof G.round!=='number')G.round=1;
+    G.round++;
+    if(!Array.isArray(G.roundHistory))G.roundHistory=[];
+    clearPlayArea();
+    // Ensure trumpDecider is valid (0-3)
+    if(typeof G.trumpDecider!=='number'||G.trumpDecider<0||G.trumpDecider>3)G.trumpDecider=0;
+    updateTrumpStar();
+    initRound();
+  }catch(e){
+    console.error('nextRoundSP error:',e);
+    // Hard fallback — reload the round from scratch
+    G.round=G.round||2;
+    G.trumpDecider=G.trumpDecider||0;
+    if(!Array.isArray(G.roundHistory))G.roundHistory=[];
+    initRound();
+  }
+}
+
+// ── BACKGROUND MUSIC ──
+let musicOn=true;
+function startMusic(){
+  const bgm=document.getElementById('bgm');
+  if(!bgm)return;
+  bgm.volume=0;
+  bgm.play().catch(()=>{});
+  // Fade in gently over 4 seconds
+  let v=0;
+  const fade=setInterval(()=>{
+    v=Math.min(v+0.005, 0.09); // max 9% volume — chill background level
+    bgm.volume=v;
+    if(v>=0.09)clearInterval(fade);
+  },200);
+}
+function toggleMusic(){
+  const bgm=document.getElementById('bgm');
+  const lbl=document.getElementById('mlabel');
+  if(!bgm)return;
+  musicOn=!musicOn;
+  if(musicOn){
+    bgm.play().catch(()=>{});
+    bgm.volume=0.09;
+    lbl.textContent='Music On';
+  } else {
+    bgm.pause();
+    lbl.textContent='Music Off';
+  }
+}
+// Start on first user interaction (browser autoplay policy)
+document.addEventListener('click',function startOnce(){
+  startMusic();
+  document.removeEventListener('click',startOnce);
+},{once:true});
+
+
+// ══════════════════════════════════════════
+// ── MULTIPLAYER (Firebase Realtime DB) ──
+// ══════════════════════════════════════════
+let MP={}, mpListener=null;
+
+// SEAT_NAMES defined above
+// SEAT_TEAMS defined above
+
+function getUID(){
+  let uid=localStorage.getItem('dol_uid');
+  if(!uid){uid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dol_uid',uid);}
+  return uid;
+}
+function genCode(){return Array.from({length:6},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*24)]).join('');}
+
+// showScreen defined above
+
+// ── Hardcoded Firebase config — no setup screen needed ──
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyDfBBEBpPZvPEmJvVT4qGVtZYF9mWya2pw",
+  authDomain:"dol-game.firebaseapp.com",
+  databaseURL:"https://dol-game-default-rtdb.firebaseio.com",
+  projectId:"dol-game",
+  storageBucket:"dol-game.firebasestorage.app",
+  messagingSenderId:"883802526955",
+  appId:"1:883802526955:web:29a6360a03e635d9d99aae"
+};
+
+function goToMultiplayer(){
+  if(!db){
+    try{initFirebase(FIREBASE_CONFIG);}
+    catch(e){console.error('Firebase init failed:',e);return;}
+  }
+  showScreen('mp-lobby-screen');
+}
+
+function initFirebase(cfg){
+  if(firebase.apps.length)firebase.app().delete();
+  const app=firebase.initializeApp(cfg);
+  db=firebase.database(app);
+}
+
+function saveFirebaseConfig(){
+  const raw=document.getElementById('fb-config-input').value.trim();
+  const errEl=document.getElementById('fb-config-error');
+  try{
+    // Strip trailing semicolons, whitespace, variable assignment wrappers
+    let cleaned=raw
+      .replace(/^\s*const\s+\w+\s*=\s*/, '') // remove "const x = "
+      .replace(/;\s*$/, '')                        // remove trailing ;
+      .trim();
+    // Quote unquoted JS object keys: word: → "word":
+    cleaned=cleaned.replace(/([{,]\s*)([a-zA-Z_$][\w$]*)\s*:/g,'$1"$2":');
+    // Replace single quotes with double quotes
+    cleaned=cleaned.replace(/'/g,'"');
+    // Wrap in braces if not already
+    if(!cleaned.startsWith('{'))cleaned='{'+cleaned+'}';
+    const cfg=JSON.parse(cleaned);
+    if(!cfg.databaseURL){errEl.textContent='Missing databaseURL — check your config';return;}
+    initFirebase(cfg);
+    localStorage.setItem('dol_fb_config',JSON.stringify(cfg));
+    errEl.textContent='';
+    showScreen('mp-lobby-screen');
+  } catch(e){
+    errEl.textContent='Invalid config — paste the object from Firebase console';
+  }
+}
+
+// [endRound defined above]
+
+
+// ── ROUTERS ──
+function nextRound(){
+  if(G.isMultiplayer){mpNextRound();}
+  else{nextRoundSP();}
+}
+function handlePickTrump(suit){
+  if(G.isMultiplayer){mpPickTrump(suit);}
+  else{pickTrump(suit);}
+}
+function pickTrumpSP(suit){pickTrump(suit);}
+
+
+// ── VOID & DISCARD TRACKING ──
+function recordVoid(player,suit){
+  if(!G.voidTracker)G.voidTracker={};
+  if(!G.voidTracker[player])G.voidTracker[player]=new Set();
+  G.voidTracker[player].add(suit);
+}
+function isKnownVoid(player,suit){return !!(G.voidTracker&&G.voidTracker[player]&&G.voidTracker[player].has(suit));}
+// [recordDiscard defined above]
+
+// ── BOT AI ──
+
+// ── Card counting helpers ──
+// How many cards of a given suit have been played (excl. current trick)
+function suitPlayed(suit){return G.playedCards.filter(c=>c.suit===suit).length;}
+// How many cards of a suit remain in the unknown pool (approx)
+function suitRemaining(suit){
+  const total=13;
+  const inMyHand=G.hands[G.currentPlayer].filter(c=>c.suit===suit).length;
+  const played=suitPlayed(suit);
+  const inCurrentTrick=G.trick.filter(t=>t.card.suit===suit).length;
+  return total-inMyHand-played-inCurrentTrick;
+}
+// Is a given suit likely exhausted from opponents' hands?
+// If 11+ of 13 cards of that suit have been seen, opponents are almost certainly void
+function suitLikelyExhausted(suit){
+  const seen=suitPlayed(suit)+G.trick.filter(t=>t.card.suit===suit).length;
+  return seen>=10; // 10+ of 13 seen = very likely exhausted in opponents
+}
+// Count trump cards still unaccounted for (not in my hand, not played)
+function trumpsUnseen(myHand){
+  const trumpPlayed=G.playedCards.filter(c=>c.suit===G.trump).length;
+  const trumpInHand=myHand.filter(c=>c.suit===G.trump).length;
+  const trumpInTrick=G.trick.filter(t=>t.card.suit===G.trump).length;
+  return 13-trumpPlayed-trumpInHand-trumpInTrick;
+}
+// How many trump cards has my last trump cost relative to how many enemies might have
+function trumpSqueezeWorthIt(myHand,isOpp){
+  // Worth spending trump if: we're ahead in Dols, mid-game, and draining opp trump reserves
+  const myDols=isOpp?G.theirTens:G.yourTens;
+  const oppDols=isOpp?G.yourTens:G.theirTens;
+  const midGame=G.tricks>=3&&G.tricks<=9;
+  return myDols>=oppDols && midGame && trumpsUnseen(myHand)>=4;
+}
+
+// ── Position awareness ──
+// My position in the current trick (0=first, 1=second, 2=third, 3=last)
+function myPosition(p){return G.trick.length;}
+// Is the next player after me an enemy?
+function nextIsEnemy(p,isOpp){
+  const idx=ORDER.indexOf(p);
+  const next=ORDER[(idx+1)%4];
+  return isOpp?(next===0||next===1):(next===2||next===3);
+}
+
+// ── Partner signal reading ──
+// Did partner lead a HIGH card (K/A)? → they're confident, play low and support
+function partnerLeadingHigh(){
+  if(G.trick.length===0)return false;
+  const first=G.trick[0];
+  const ally=TEAMMATE[G.currentPlayer];
+  const isAllyLead=first.player===ally;
+  return isAllyLead && rv(first.card.rank)>=13;
+}
+// Did partner lead LOW? → possibly voiding, let them complete it
+function partnerLeadingLow(){
+  if(G.trick.length===0)return false;
+  const first=G.trick[0];
+  const ally=TEAMMATE[G.currentPlayer];
+  const isAllyLead=first.player===ally;
+  return isAllyLead && rv(first.card.rank)<=6;
+}
+
+// ── Advanced memory & inference helpers ──
+
+// Track which players went void in which suits (showed trump when they couldn't follow)
+// G.voidTracker = { player: Set of suits they're void in }
+// [recordVoid defined above]
+// [isKnownVoid defined above]
+// Call this when a player plays off-suit (didn't follow lead)
+function updateVoidTracker(player,cardSuit,leadSuit){
+  if(leadSuit&&cardSuit!==leadSuit)recordVoid(player,leadSuit);
+}
+
+// Ally's void suits (suits where ally has shown void in this round)
+function allyVoids(p){
+  // p = current player index; ally is always TEAMMATE[p]
+  const ally=TEAMMATE[p||G.currentPlayer];
+  if(!G.voidTracker||!G.voidTracker[ally])return new Set();
+  return G.voidTracker[ally];
+}
+
+// Does next enemy hold a tenace (A-Q) in this suit? (inferred from plays)
+// Simplified: if suit king hasn't been played and we don't have it, they might
+function enemyLikelyHasTenace(suit,myHand,isOpp){
+  const kingSeen=G.playedCards.some(c=>c.suit===suit&&c.rank==='K')||
+    myHand.some(c=>c.suit===suit&&c.rank==='K')||
+    G.trick.some(t=>t.card.suit===suit&&t.card.rank==='K');
+  const aceSeen=G.playedCards.some(c=>c.suit===suit&&c.rank==='A')||
+    myHand.some(c=>c.suit===suit&&c.rank==='A')||
+    G.trick.some(t=>t.card.suit===suit&&t.card.rank==='A');
+  return !kingSeen&&!aceSeen; // if K and A are both unseen, tenace possible
+}
+
+// Is a suit the trump suit (revealed strength of trump decider's team)?
+function isTrumpDeciderSuit(suit){return suit===G.trump;}
+
+// Can I finesse in this suit? (I hold A, Q but not K — lead Q through likely K holder)
+function canFinesse(myHand,suit){
+  const hasA=myHand.some(c=>c.suit===suit&&c.rank==='A');
+  const hasQ=myHand.some(c=>c.suit===suit&&c.rank==='Q');
+  const hasK=myHand.some(c=>c.suit===suit&&c.rank==='K');
+  const kPlayed=G.playedCards.some(c=>c.suit===suit&&c.rank==='K');
+  return hasA&&hasQ&&!hasK&&!kPlayed;
+}
+
+// Are all 4 tens accounted for? → pure Inn tiebreaker mode
+function allTensPlayed(){return G.tensOut>=4;}
+
+// Count ally's known void suits — for cross-ruff detection
+function allyVoidCount(p){
+  const ally=TEAMMATE[p||G.currentPlayer];
+  if(!G.voidTracker||!G.voidTracker[ally])return 0;
+  return G.voidTracker[ally].size;
+}
+
+// Would leading this suit hand the next enemy a free trump (they're void in it)?
+function nextEnemyVoidIn(suit,p,isOpp){
+  const idx=ORDER.indexOf(p);
+  const next=ORDER[(idx+1)%4];
+  const nextIsEnemy2=isOpp?(next===0||next===1):(next===2||next===3);
+  if(!nextIsEnemy2)return false;
+  return isKnownVoid(next,suit);
+}
+
+// ── Master card detection ──
+// A card is a "master" if all higher cards of its suit have been played
+// (i.e. it's currently unbeatable in its suit, excluding trump)
+function isMasterCard(card,myHand){
+  if(card.suit===G.trump)return false; // handle trump separately
+  const higherRanks=Object.keys(RV).filter(r=>rv(r)>rv(card.rank));
+  return higherRanks.every(r=>{
+    const played=G.playedCards.some(c=>c.suit===card.suit&&c.rank===r);
+    const inHand=myHand.some(c=>c.suit===card.suit&&c.rank===r);
+    const inTrick=G.trick.some(t=>t.card.suit===card.suit&&t.card.rank===r);
+    return played||inHand||inTrick; // accounted for — not in enemy hands
+  });
+}
+// Get all master cards from playable indices
+function getMasters(h,pi){
+  return pi.filter(i=>h[i]&&isMasterCard(h[i],h));
+}
+
+// ── Discard signal reading ──
+// When a player discards (can't follow, doesn't trump), track the discard
+// High discard → weak in that suit, Low discard → protecting something
+// G.discardTracker = { player: [{suit,rank}] }
+function recordDiscard(player,card){
+  if(!G.discardTracker)G.discardTracker={};
+  if(!G.discardTracker[player])G.discardTracker[player]=[];
+  G.discardTracker[player].push({suit:card.suit,rank:card.rank});
+}
+function playerDiscardedHighIn(player,suit){
+  if(!G.discardTracker||!G.discardTracker[player])return false;
+  return G.discardTracker[player].some(d=>d.suit===suit&&rv(d.rank)>=11);
+}
+// Did opponent discard LOW in a suit? → they might be protecting something valuable
+function opponentDiscardedLowIn(player,suit){
+  if(!G.discardTracker||!G.discardTracker[player])return false;
+  return G.discardTracker[player].some(d=>d.suit===suit&&rv(d.rank)<=6);
+}
+
+// ── Long suit detection ──
+// If I hold 4+ cards of a suit, I have a "long suit" — lead it repeatedly
+// to exhaust opponents and establish masters in the endgame
+function getLongSuits(myHand,trumpSuit){
+  const counts={};
+  for(const s of SUITS){
+    if(s===trumpSuit)continue;
+    counts[s]=myHand.filter(c=>c.suit===s&&c.rank!=='10').length;
+  }
+  return Object.entries(counts).filter(([,cnt])=>cnt>=4).map(([s])=>s);
+}
+
+// ── Trump parity ──
+// Does my team hold more trump than opponents (inferred from unseen pool)?
+function myTeamTrumpAdvantage(myHand,isOpp){
+  const myTrump=myHand.filter(c=>c.suit===G.trump).length;
+  const unseenTrump=trumpsUnseen(myHand);
+  // Rough split: assume unseen split evenly between 3 other players
+  const estimatedOppTrump=Math.round(unseenTrump*0.5); // opponents get ~half
+  return myTrump>estimatedOppTrump;
+}
+
+// ── Safe exit card ──
+// A card in a suit where the highest remaining card is in my team's hands
+// (so leading it won't gift an opponent a winner)
+function getSafeExitCard(h,pi,isOpp){
+  for(const i of pi){
+    const card=h[i];
+    if(!card||card.suit===G.trump||card.rank==='10')continue;
+    // Is this card in an exhausted suit (safe to lead)?
+    if(suitLikelyExhausted(card.suit))return i;
+    // Is this card a master?
+    if(isMasterCard(card,h))return i;
+    // Is opponent known void in this suit? Skip (they'd trump)
+    const idx=ORDER.indexOf(G.currentPlayer);
+    const next=ORDER[(idx+1)%4];
+    const nextEnemy=isOpp?(next===0||next===1):(next===2||next===3);
+    if(nextEnemy&&isKnownVoid(next,card.suit))continue;
+    // Low card in a suit opponents discarded high from → safe
+    if(rv(card.rank)<=7){
+      const enemyList=isOpp?[0,1]:[2,3];
+      if(enemyList.some(pl=>playerDiscardedHighIn(pl,card.suit)))return i;
+    }
+  }
+  return null;
+}
+
+// ── Covering honours ──
+// Should I cover an opponent's honour with my next higher card?
+// "Cover an honour with an honour" — forces their best cards out
+function shouldCoverHonour(myHand,pi,ls){
+  if(G.trick.length===0||!G.leadSuit)return null;
+  const leadCard=G.trick[0].card;
+  const leadRank=rv(leadCard.rank);
+  if(leadRank<11||leadRank>=14)return null;
+  // Find cheapest card in playable indices that beats the honour
+  const cover=cheapestWin(myHand,pi,ls);
+  if(cover===null)return null;
+  const coverCard=myHand[cover];
+  // Only cover honour with honour (J/Q/K/A beats J/Q/K)
+  if(rv(coverCard.rank)>=11)return cover;
+  return null;
+}
+
+// ── Trump decider suit inference ──
+// Opponents know trump team is strong in trump — track how many trump
+// the decider's team likely holds based on what's been played
+function trumpDeciderSuitDanger(isOpp){
+  // If I'm on the non-trump team, trump suit leads are dangerous early
+  const deciderOnMyTeam=isOpp?(G.trumpDecider===2||G.trumpDecider===3):(G.trumpDecider===0||G.trumpDecider===1);
+  if(deciderOnMyTeam)return false; // trump strength is mine
+  const earlyRound=G.tricks<=5;
+  const trumpStillLoaded=trumpsUnseen(G.hands[G.currentPlayer])>=5;
+  return earlyRound&&trumpStillLoaded; // opponents loaded with trump early
+}
+
+// ── Singleton / Doubleton management ──
+function suitCount(hand,suit){return hand.filter(c=>c.suit===suit).length;}
+function isSingleton(hand,suit){return suitCount(hand,suit)===1;}
+function isDoubleton(hand,suit){return suitCount(hand,suit)===2;}
+// Suits worth voiding soon (1-2 cards, not trump, no 10 left in that suit)
+function suitToVoidSoon(hand,trump){
+  return SUITS.filter(s=>{
+    if(s===trump)return false;
+    const cnt=suitCount(hand,s);
+    if(cnt===0||cnt>2)return false;
+    const hasTen=hand.some(c=>c.suit===s&&c.rank==='10');
+    return !hasTen;
+  });
+}
+
+// ── Restricted choice inference ──
+// If opponent played a specific honour when they could have played a higher one,
+// they probably didn't have the higher one → infer their holding
+function inferredLacking(player,suit,rank){
+  // If player played rank R, higher cards of same suit they played through are likely absent
+  const played=G.playedCards.filter(c=>c.player===player&&c.suit===suit);
+  if(played.length===0)return false;
+  const maxPlayed=Math.max(...played.map(c=>rv(c.rank)));
+  return maxPlayed<rv(rank); // they never played rank or higher
+}
+
+// ── Hand shape inference ──
+// Track how many times each player followed in each suit
+// If they've followed 4+ times, they have a long suit there
+function playerFollowCount(player,suit){
+  return G.playedCards.filter(c=>c.suit===suit&&G.trick&&G.trick.some&&false).length;
+  // Simplified: count how many times player played this suit historically
+}
+function playerLikelyLong(player,suit){
+  const timesPlayed=G.playedCards.filter((c,i)=>{
+    // Approximate: count suit plays by player from played cards
+    return c.suit===suit;
+  }).length;
+  return timesPlayed>=4;
+}
+
+// ── Trump extraction (last trump) ──
+// After opponents' trump is depleted, masters in side suits become safe
+function opponentsTrumpExhausted(isOpp){
+  const trumpPlayed=G.playedCards.filter(c=>c.suit===G.trump).length;
+  const myTrump=G.hands[G.currentPlayer].filter(c=>c.suit===G.trump).length;
+  const trickTrump=G.trick.filter(t=>t.card.suit===G.trump).length;
+  const remaining=13-trumpPlayed-myTrump-trickTrump;
+  return remaining<=1; // essentially exhausted
+}
+
+// ── All-trump / No-trump hand detection ──
+function handIsTrumpHeavy(hand,trump){
+  const trumpCount=hand.filter(c=>c.suit===trump).length;
+  return trumpCount>=5; // 5+ trump = trump-heavy hand
+}
+function handHasNoTrump(hand,trump){
+  return !hand.some(c=>c.suit===trump);
+}
+
+// ── Score proximity to 21 (match-point pressure) ──
+// How urgently does each team need points?
+function myScorePressure(isOpp){
+  const myScore=isOpp?G.theirScore:G.yourScore;
+  const oppScore=isOpp?G.yourScore:G.theirScore;
+  // Closer to 21 = more pressure. Differential matters.
+  const myNeed=21-myScore;
+  const oppNeed=21-oppScore;
+  return {myNeed,oppNeed,critical:myNeed<=3||oppNeed<=2};
+}
+// Should we sacrifice a round to save resources for next round?
+function sacrificeRoundWorthIt(isOpp){
+  const {myNeed,oppNeed}=myScorePressure(isOpp);
+  // Only sacrifice if: we're comfortably ahead in score AND this round is going badly
+  const myScore=isOpp?G.theirScore:G.yourScore;
+  const oppScore=isOpp?G.yourScore:G.theirScore;
+  return myScore-oppScore>=5 && oppNeed>4;
+}
+
+// ── Trump promotion detection ──
+// If we lead a suit that an enemy will trump with a LOW trump,
+// it promotes our medium trumps into winners
+function trumpPromotionOpportunity(hand,isOpp){
+  const myMidTrump=hand.filter(c=>c.suit===G.trump&&rv(c.rank)>=9&&rv(c.rank)<=11);
+  if(myMidTrump.length===0)return false;
+  // Do we have a suit we can lead that an enemy is likely void in?
+  // If so, they'll ruff low, we overruff, promoting our mid-trumps
+  const ally=TEAMMATE[G.currentPlayer];
+  const allyV=G.voidTracker&&G.voidTracker[ally]?G.voidTracker[ally]:new Set();
+  return myMidTrump.length>0; // simplified: available if we have mid-trumps
+}
+
+// ── Throw-in detection ──
+// Give the lead to an opponent who has no good cards to play
+// Signs: they're known void in multiple suits, only have trumps or 10s left (inferred)
+function throwInTarget(isOpp){
+  const enemies=isOpp?[0,1]:[2,3];
+  for(const e of enemies){
+    const voids=G.voidTracker&&G.voidTracker[e]?G.voidTracker[e].size:0;
+    if(voids>=2)return e; // void in 2+ suits = limited options = throw-in candidate
+  }
+  return null;
+}
+
+// ── Attitude signal reading ──
+// On first play of a suit, high card = strength signal, low card = weakness
+function opponentSignaledStrengthIn(player,suit){
+  // Strength signal: player discarded HIGH from this suit (they chose to keep something else)
+  // Or: they led this suit with a high card early
+  if(G.discardTracker&&G.discardTracker[player]){
+    return G.discardTracker[player].some(d=>d.suit===suit&&rv(d.rank)>=9);
+  }
+  return false;
+}
+function opponentSignaledWeaknessIn(player,suit){
+  // Weakness signal: player discarded LOW from this suit (showing they're not protecting it)
+  if(G.discardTracker&&G.discardTracker[player]){
+    return G.discardTracker[player].some(d=>d.suit===suit&&rv(d.rank)<=5);
+  }
+  return false;
+}
+
+// ── Ruff and discard avoidance ──
+// Never lead a suit if both opponents are void in it (gives them ruff-and-discard)
+function ruffAndDiscardDanger(suit,isOpp){
+  const enemies=isOpp?[0,1]:[2,3];
+  const bothVoid=enemies.every(e=>isKnownVoid(e,suit));
+  return bothVoid;
+}
+
+// ── Helper: can this card beat the current best card in the trick?
+function canBeat(card,ls){
+  if(G.trick.length===0)return true;
+  const tm=Object.fromEntries(G.trick.map(t=>[t.player,t]));
+  const wi=trickWinner(tm,ls||G.leadSuit);
+  const best=G.trick[wi].card;
+  return cmp(card,best,ls||G.leadSuit)>0;
+}
+
+// Helper: does the stack currently contain a 10?
+function stackHasTen(){return G.trick.some(t=>t.card.rank==='10');}
+
+// Helper: are any remaining opponents likely able to beat this card?
+// Simplified: checks if any of the remaining players to play have trump
+function oppsHaveTrump(myTeamIsOpp,playersLeft){
+  // playersLeft = players who haven't played yet this trick
+  return playersLeft.some(pl=>{
+    const isEnemy=myTeamIsOpp?(pl===0||pl===1):(pl===2||pl===3);
+    return isEnemy&&G.hands[pl].some(c=>c.suit===G.trump);
+  });
+}
+
+// Helper: lowest non-10 card from a set of indices
+function lowestNonTen(h,pi){
+  if(!pi||pi.length===0)return undefined;
+  const nonTen=pi.filter(i=>h[i]&&h[i].rank!=='10');
+  const pool=nonTen.length>0?nonTen:pi;
+  if(pool.length===0)return undefined;
+  return pool.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+}
+
+// Helper: lowest card overall
+function lowest(h,pi){
+  if(!pi||pi.length===0)return undefined;
+  return pi.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+}
+
+// Helper: highest card overall
+function highest(h,pi){
+  if(!pi||pi.length===0)return undefined;
+  return pi.reduce((a,b)=>rv(h[a].rank)>rv(h[b].rank)?a:b);
+}
+
+// Helper: just-enough card to win (lowest card that beats current best)
+function cheapestWin(h,pi,ls){
+  if(!pi||pi.length===0)return null;
+  const winners=pi.filter(i=>h[i]&&canBeat(h[i],ls));
+  if(winners.length===0)return null;
+  return winners.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+}
+
+function botPlay(){
+  const p=G.currentPlayer;
+  const h=G.hands[p];
+  const isOpp=p===2||p===3; // opponents = 2,3; your team = 0,1
+
+  // Build playable card indices (must follow lead suit if possible)
+  let pi=[];
+  let voidInLeadSuit=false;
+  if(G.leadSuit){
+    const follow=h.map((c,i)=>c.suit===G.leadSuit?i:-1).filter(i=>i>=0);
+    if(follow.length>0){
+      pi=follow;
+    } else {
+      // Bot is VOID in lead suit — can play anything including trump
+      pi=h.map((_,i)=>i);
+      voidInLeadSuit=true;
+    }
+  } else {
+    pi=h.map((_,i)=>i);
+  }
+
+  // Separate useful card categories from playable set
+  const tens=pi.filter(i=>h[i].rank==='10');
+  const trumps=pi.filter(i=>h[i].suit===G.trump&&h[i].rank!=='10');
+  const nonTens=pi.filter(i=>h[i].rank!=='10');
+  const nonTrumpNonTen=pi.filter(i=>h[i].suit!==G.trump&&h[i].rank!=='10');
+
+  let chosen=lowest(h,pi); // safe fallback
+
+  // ── Late-game score awareness ──
+  const myTotalDols=isOpp?G.theirTens:G.yourTens;   // individual 10s for strategy
+  const oppTotalDols=isOpp?G.yourTens:G.theirTens;
+  const tensRemaining=4-G.tensOut; // how many 10s are still in play
+  const tricksLeft=13-G.tricks;
+  // Behind with few tricks left = play aggressively (take risks for Dols)
+  const desperateModeOn=oppTotalDols>myTotalDols && tricksLeft<=4 && tensRemaining>0;
+  // Comfortably ahead = protect lead, be conservative
+  // 3+ tens vs 0 = near certain win, just don't blow it
+  const conservativeModeOn=myTotalDols>=3 && oppTotalDols===0;
+
+  // ── Endgame exact calculation ──
+  // With 3 or fewer tricks left, calculate exactly what we need
+  const endgame=tricksLeft<=3;
+  const needDolToTie=oppTotalDols>myTotalDols&&oppTotalDols-myTotalDols<=tensRemaining;
+  const needDolToWin=needDolToTie&&myTotalDols+tensRemaining>oppTotalDols;
+  const canAffordToLose=myTotalDols>oppTotalDols&&myTotalDols-oppTotalDols>tensRemaining;
+  // In endgame: if we can afford to lose all remaining tens and still win → play defensively
+  // If we need a specific ten → play maximally aggressively on Dol tricks
+  const endgameAggressive=endgame&&needDolToTie&&tensRemaining>0;
+  const endgameDefensive=endgame&&canAffordToLose;
+
+  // ── Post-tens mode: all 10s played → pure Inn tiebreaker ──
+  const postTensMode=allTensPlayed();
+
+  // ── Trump Decider suit: avoid leading into it as opponents ──
+  // Decider's team chose trump for a reason — they're strong in it
+  const avoidTrumpDeciderSuit=isTrumpDeciderSuit(G.trump); // already trump, always avoided as non-trump lead
+
+  // ── Ally's known voids (for cross-ruff coordination) ──
+  const myAllyVoids=allyVoids(p);
+  const crossRuffPossible=myAllyVoids.size>0&&h.some(c=>myAllyVoids.has(c.suit)&&c.suit!==G.trump);
+
+  // ── Sacrifice Dol prevention (avoid 0-4 sweep) ──
+  // If opponents have 3 tens and we have 0, desperately fight for 1
+  const facingSweep=oppTotalDols>=3&&myTotalDols===0&&tensRemaining>0;
+
+  // ── Master cards ──
+  const masterCards=getMasters(h,pi);
+  const masterNonTrump=masterCards.filter(i=>h[i]&&h[i].suit!==G.trump&&h[i].rank!=='10');
+
+  // ── Long suit ──
+  const longSuits=getLongSuits(h,G.trump);
+  const longSuitLeads=pi.filter(i=>h[i]&&longSuits.includes(h[i].suit)&&h[i].rank!=='10');
+
+  // ── Trump parity ──
+  const teamHasTrumpAdvantage=myTeamTrumpAdvantage(h,isOpp);
+
+  // ── Trump decider danger ──
+  const trumpDanger=trumpDeciderSuitDanger(isOpp);
+
+  // ── Hand shape flags ──
+  const trumpHeavy=handIsTrumpHeavy(h,G.trump);
+  const noTrump=handHasNoTrump(h,G.trump);
+  const suitsToVoid=suitToVoidSoon(h,G.trump);
+  const throwIn=throwInTarget(isOpp);
+  const oppsTrumpGone=opponentsTrumpExhausted(isOpp);
+  const scorePressure=myScorePressure(isOpp);
+  const sacrificeMode=sacrificeRoundWorthIt(isOpp);
+  const ruffPromotion=trumpPromotionOpportunity(h,isOpp);
+
+  // ── LEADING the trick ──
+  if(G.trick.length===0){
+    // Count cards per suit in hand (excluding trump)
+    const suitCounts={};
+    for(const s of ['♠','♥','♦','♣']){
+      if(s===G.trump)continue;
+      suitCounts[s]=h.filter(c=>c.suit===s).length;
+    }
+
+    // Void strategy: find suits where we have exactly 1 card left AND that card is not a 10
+    // We never void using a 10 — 10s are too valuable to lead away
+    // (A suit where the last card IS a 10 is excluded — we hold it until forced or it wins a Dol)
+    const almostVoid=Object.entries(suitCounts)
+      .filter(([s,cnt])=>{
+        if(cnt!==1)return false;
+        const lastCard=h.find(c=>c.suit===s);
+        return lastCard&&lastCard.rank!=='10'; // only void if the last card is not a 10
+      })
+      .map(([s])=>s);
+
+    // Find playable cards in almost-void suits (already guaranteed non-10 by almostVoid filter)
+    const voidLeads=pi.filter(i=>h[i]&&almostVoid.includes(h[i].suit)&&h[i].rank!=='10');
+
+    // Bots should almost NEVER lead a 10 — only as absolute last resort
+    const safeLeads=pi.filter(i=>h[i]&&h[i].rank!=='10'&&h[i].suit!==G.trump);
+    const _trickHasTenLead=false; // no trick yet when leading (local only)
+
+    // Early-game Ace tactic: in the first 4 tricks, lead Aces aggressively.
+    // Early on, players still have full suits — void situations are rare, so
+    // trump counter-plays are less likely. An Ace wins the stack cleanly
+    // and opens the door for teammates to drop a 10 on it safely.
+    const earlyGame=G.tricks<=4;
+    const aces=safeLeads.filter(i=>h[i]&&h[i].rank==='A');
+
+    // ── Trump-heavy hand: lead trump immediately to control round ──
+    if(trumpHeavy && trumps.length>=5 && G.tricks<=2){
+      // Drain opponents' trump early when we have overwhelming trump power
+      chosen=lowest(h,trumps);
+    }
+    // ── No-trump hand: focus entirely on mastering side suits ──
+    else if(noTrump && masterNonTrump.length>0){
+      chosen=masterNonTrump[0];
+    }
+    // ── Ruff-and-discard avoidance: never lead if both enemies void ──
+    // (filtered into safeLeads logic below via ruffAndDiscardDanger)
+
+    // ── Conservative mode: 3-0 lead → don't do anything risky ──
+    // Just lead safe low cards — let opponents burn resources
+    else if(conservativeModeOn && safeLeads.length>0){
+      // Lead the safest (lowest non-trump non-10) card — no need to be clever
+      const noRuffSafe=safeLeads.filter(i=>h[i]&&!ruffAndDiscardDanger(h[i].suit,isOpp)&&!nextEnemyVoidIn(h[i].suit,p,isOpp));
+      const pool=noRuffSafe.length>0?noRuffSafe:safeLeads;
+      chosen=pool.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+    }
+    // ── Post-tens mode: all 10s gone → maximise Inn wins ──
+    else if(postTensMode){
+      // Lead master cards first — guaranteed wins
+      if(masterNonTrump.length>0){
+        chosen=masterNonTrump.reduce((a,b)=>rv(h[b].rank)>rv(h[a].rank)?b:a);
+      } else if(safeLeads.length>0){
+        const sorted=[...safeLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
+        chosen=sorted[0];
+      }
+    }
+    // ── Avoid leading into next enemy's known void ──
+    // Filter safeLeads to exclude suits where next enemy is void
+    else if(safeLeads.length>0&&safeLeads.some(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp))){
+      const safestLeads=safeLeads.filter(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp));
+      const sortedSafe=[...safestLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
+      // Use safest leads pool for subsequent lead logic (shadow safeLeads)
+      safeLeads.length=0;sortedSafe.forEach(i=>safeLeads.push(i));
+    }
+    // ── Finesse: lead Q when holding A-Q without K ──
+    // Forces K out of opponents if they have it, then A takes control next trick
+    if(false){ /* finesse applied below in suit-specific lead */ }
+
+    // ── Suit exhaustion: lead exhausted suits to force voids ──
+    // If a suit is nearly gone from the game (10+ seen), leading it forces opponents
+    // to trump or discard. Use this to probe and drain trump reserves mid-game.
+    const exhaustedSuitLeads=safeLeads.filter(i=>{
+      const s=h[i].suit;
+      return suitLikelyExhausted(s) && suitCounts[s]>1; // still have cards to lead
+    });
+
+    // ── Trump squeeze lead ──
+    // Mid-game, if we're ahead, lead trump to drain opponent reserves
+    // so they can't steal future Dols
+    const trumpSqueezeLead=trumpSqueezeWorthIt(h,isOpp)&&trumps.length>0;
+
+    if(earlyGame && aces.length>0){
+      // ── Entry management: save Ace if tens still out and mid-late game ──
+      // An Ace is best used to seize the lead at a critical moment (when a 10 might appear)
+      // In early game (tricks ≤ 2): lead freely. In tricks 3-4: only lead Ace if no tens remain nearby
+      const saveAceForEntry=G.tricks>=2&&tensRemaining>=2&&!desperateModeOn;
+      if(!saveAceForEntry){
+        // Lead the Ace of the deepest suit
+        const aceBySuitDepth=[...aces].sort((a,b)=>{
+          const countA=h.filter(c=>c.suit===h[a].suit).length;
+          const countB=h.filter(c=>c.suit===h[b].suit).length;
+          return countB-countA;
+        });
+        chosen=aceBySuitDepth[0];
+      }
+      // else fall through — save the Ace, pick another lead
+    }
+    // ── Master card leads — unbeatable in suit ──
+    else if(masterNonTrump.length>0&&!postTensMode){
+      // Lead a master card confidently — guaranteed to win the trick
+      // Pick the master in the longest suit to establish that suit
+      const masterBySuit=masterNonTrump.sort((a,b)=>{
+        const cntA=h.filter(c=>c.suit===h[a].suit).length;
+        const cntB=h.filter(c=>c.suit===h[b].suit).length;
+        return cntB-cntA;
+      });
+      chosen=masterBySuit[0];
+    }
+    // ── Long suit establishment ──
+    else if(longSuitLeads.length>0&&G.tricks<=6&&!desperateModeOn){
+      // Lead long suit repeatedly to exhaust opponents and establish masters
+      // Avoid leading into known enemy voids
+      const safeLongLeads=longSuitLeads.filter(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp));
+      if(safeLongLeads.length>0){
+        // Lead lowest of the long suit (preserve high cards for later masters)
+        chosen=safeLongLeads.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+      }
+    }
+    else if(trumpSqueezeLead&&teamHasTrumpAdvantage){
+      // Trump squeeze: only lead trump if we have the advantage
+      chosen=lowest(h,trumps);
+    }
+    // ── Last trump extraction: lead trump to clear opponents' last trump ──
+    // Once their last trump is pulled, all our masters in side suits are safe
+    else if(oppsTrumpGone&&!postTensMode){
+      // Opponents have no trump left — all our non-trump high cards are now safe
+      if(masterNonTrump.length>0){
+        // Lead master in longest suit for maximum pressure
+        const masterBySuit2=[...masterNonTrump].sort((a,b)=>{
+          const cA=h.filter(c=>c.suit===h[a].suit).length;
+          const cB=h.filter(c=>c.suit===h[b].suit).length;
+          return cB-cA;
+        });
+        chosen=masterBySuit2[0];
+      } else if(safeLeads.length>0){
+        // No masters, but opponents can't trump — lead highest safe card
+        const sorted=[...safeLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
+        chosen=sorted[0];
+      }
+    }
+    // ── Singleton / doubleton void planning ──
+    // Prioritise completing voids in suits with 1-2 cards (not 10s)
+    else if(suitsToVoid.length>0&&!desperateModeOn&&G.tricks<=8){
+      const singletons=pi.filter(i=>h[i]&&suitsToVoid.includes(h[i].suit)&&isSingleton(h,h[i].suit)&&h[i].rank!=='10');
+      const doubletons=pi.filter(i=>h[i]&&suitsToVoid.includes(h[i].suit)&&isDoubleton(h,h[i].suit)&&h[i].rank!=='10');
+      // Prioritise singletons (quickest void)
+      if(singletons.length>0)chosen=singletons.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+      else if(doubletons.length>0)chosen=doubletons.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+    }
+    else if(exhaustedSuitLeads.length>0){
+      // Lead exhausted suit to force voids and probe trump holdings
+      const sorted=[...exhaustedSuitLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
+      chosen=sorted[0]; // lead highest exhausted-suit card to maximise pressure
+    }
+    else if(voidLeads.length>0){
+      // Void-completing lead
+      chosen=voidLeads.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+    }
+    else if(safeLeads.length>0){
+      // ── Filter out ruff-and-discard danger suits ──
+      // Never lead a suit both enemies are void in
+      const noRuffLeads=safeLeads.filter(i=>h[i]&&!ruffAndDiscardDanger(h[i].suit,isOpp));
+      const safeLeadsFiltered=noRuffLeads.length>0?noRuffLeads:safeLeads;
+      // ── Avoid trump-danger suit (decider's team loaded with trump early) ──
+      const nonDangerLeads=trumpDanger
+        ?safeLeadsFiltered.filter(i=>h[i]&&h[i].suit!==G.trump)
+        :safeLeadsFiltered;
+      const pool=nonDangerLeads.length>0?nonDangerLeads:safeLeadsFiltered;
+
+      // ── Finesse opportunity: lead Q when holding A-Q but not K ──
+      const finesseLeads=pool.filter(i=>h[i]&&canFinesse(h,h[i].suit)&&h[i].rank==='Q');
+      if(finesseLeads.length>0){
+        chosen=finesseLeads[0];
+      }
+      // ── Safe exit card: lead a guaranteed safe suit ──
+      else {
+        const safeExit=getSafeExitCard(h,pool,isOpp);
+        if(safeExit!==null&&pool.includes(safeExit)){
+          chosen=safeExit;
+        }
+        // ── Ally void cross-ruff ──
+        else {
+          const crossRuffLeads=pool.filter(i=>h[i]&&myAllyVoids.has(h[i].suit)&&h[i].suit!==G.trump);
+          if(crossRuffLeads.length>0&&G.tricks>=3&&!trumpDanger){
+            chosen=crossRuffLeads.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+          } else {
+            // Standard: second-highest non-trump non-10
+            const sorted=[...pool].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
+            chosen=sorted.length>1?sorted[1]:sorted[0];
+          }
+        }
+      }
+    }
+    else if(trumps.length>0){
+      // ── 4-3 trump split: if team holds 7 trump, leading 3 rounds clears all ──
+      const myTrumpCount=h.filter(c=>c.suit===G.trump).length;
+      const allyTrumpEst=Math.round(trumpsUnseen(h)*0.4); // rough estimate
+      const teamTrumpEst=myTrumpCount+allyTrumpEst;
+      if(teamTrumpEst>=6&&myTrumpCount>=3){
+        // We likely have trump majority — lead lowest to extract efficiently
+        chosen=lowest(h,trumps);
+      } else {
+        chosen=lowest(h,trumps);
+      }
+    }
+    else if(desperateModeOn && tens.length>0){
+      chosen=tens[0];
+    }
+    else {
+      chosen=lowestNonTen(h,pi);
+    }
+  }
+
+  // ── FOLLOWING the trick ──
+  else {
+    const tm=Object.fromEntries(G.trick.map(t=>[t.player,t]));
+    const wi=trickWinner(tm,G.leadSuit);
+    const currentWinner=G.trick[wi].player;
+    const myTeamWinning=isOpp?(currentWinner===2||currentWinner===3):(currentWinner===0||currentWinner===1);
+    const trickHasTen=stackHasTen();
+    const playersLeft=ORDER.filter(pl=>!G.trick.some(t=>t.player===pl)&&pl!==p);
+    const isLastToPlay=playersLeft.length===0;
+
+    // ── Comprehensive 10 Risk Analysis ──
+    // Returns: 'safe' | 'risky' | 'unsafe'
+    function tenRisk(tenCard){
+      const enemiesLeft=playersLeft.filter(pl=>
+        isOpp?(pl===0||pl===1):(pl===2||pl===3)
+      );
+      const alliesLeft=playersLeft.filter(pl=>
+        isOpp?(pl===2||pl===3):(pl===0||pl===1)
+      );
+      const winEntry=G.trick.length>0?G.trick[trickWinner(
+        Object.fromEntries(G.trick.map(t=>[t.player,t])),G.leadSuit
+      )]:null;
+      const currentWinCard=winEntry?winEntry.card:null;
+      const currentWinIsTrump=currentWinCard&&currentWinCard.suit===G.trump;
+      const currentWinRank=currentWinCard?rv(currentWinCard.rank):0;
+
+      // ── Risk 1: Not winning and can't win → never waste a 10 ──
+      if(!myTeamWinning && !canBeat(tenCard,G.leadSuit)) return'unsafe';
+
+      // ── Risk 2: Last to play → guaranteed ──
+      if(isLastToPlay) return canBeat(tenCard,G.leadSuit)?'safe':'unsafe';
+
+      // ── Risk 3: No enemies left to play ──
+      if(enemiesLeft.length===0) return'safe';
+
+      // ── Risk 4: Winning card is trump Ace → literally unbeatable ──
+      if(currentWinIsTrump && currentWinRank===14) return'safe';
+
+      // ── Risk 5: Winning card is trump but not Ace ──
+      // Only higher trump can beat it — check if any enemy is known to still have trump
+      if(currentWinIsTrump && currentWinRank<14){
+        const trumpPlayed=G.playedCards.filter(c=>c.suit===G.trump).length;
+        const trumpInTrick=G.trick.filter(t=>t.card.suit===G.trump).length;
+        const trumpInHand=h.filter(c=>c.suit===G.trump).length;
+        const higherTrumpPossible=13-trumpPlayed-trumpInTrick-trumpInHand>0&&
+          G.playedCards.filter(c=>c.suit===G.trump&&rv(c.rank)>currentWinRank).length===0&&
+          !h.some(c=>c.suit===G.trump&&rv(c.rank)>currentWinRank);
+        return higherTrumpPossible?'risky':'safe';
+      }
+
+      // ── Risk 6: Winning card is a non-trump Ace → only trump can beat it ──
+      // Safe if no enemy is KNOWN to be void in the lead suit
+      // (if they must follow suit, they can't trump)
+      if(!currentWinIsTrump && currentWinRank===14){
+        const anyEnemyKnownVoid=enemiesLeft.some(e=>isKnownVoid(e,G.leadSuit));
+        if(!anyEnemyKnownVoid){
+          // Enemies must follow suit — they can't trump. Safe to piggyback.
+          return'safe';
+        }
+        // A known-void enemy can trump — risky
+        return'risky';
+      }
+
+      // ── Risk 7: Winning card is a non-trump King (rank 13) ──
+      // Only an Ace in suit or trump can beat it
+      // Safe if: no enemy known void AND Ace of lead suit is already played
+      if(!currentWinIsTrump && currentWinRank===13){
+        const anyEnemyKnownVoid=enemiesLeft.some(e=>isKnownVoid(e,G.leadSuit));
+        const aceOfSuitPlayed=G.playedCards.some(c=>c.suit===G.leadSuit&&c.rank==='A')||
+          G.trick.some(t=>t.card.suit===G.leadSuit&&t.card.rank==='A');
+        const iHaveAce=h.some(c=>c.suit===G.leadSuit&&c.rank==='A');
+        if(!anyEnemyKnownVoid && (aceOfSuitPlayed||iHaveAce)) return'safe';
+        if(!anyEnemyKnownVoid) return'risky'; // Ace might still be out there
+        return'unsafe'; // known void enemy = trump threat
+      }
+
+      // ── Risk 8: Winning card is lower face card (J/Q) or below ──
+      // Higher cards in suit AND trump are both threats → unsafe
+      if(!currentWinIsTrump && currentWinRank<13) return'unsafe';
+
+      return'unsafe'; // default conservative
+    }
+
+    // ── Priority rule 1: Piggyback a 10 on a winning teammate ──
+    // Only if it is SAFE — i.e. certain our team will keep the stack
+    if(myTeamWinning && tens.length>0){
+      const trumpTen=tens.filter(i=>h[i].suit===G.trump);
+      // Prefer non-trump tens (save trump-10 for a guaranteed solo win)
+      const bestTen=trumpTen.length>0&&tens.length===1?trumpTen[0]:(tens.filter(i=>h[i].suit!==G.trump)[0]||tens[0]);
+      const risk=tenRisk(h[bestTen]);
+      if(risk==='safe'){
+        chosen=bestTen;
+        play(p,chosen);return;
+      }
+      // Risky but all enemies already played — they can't steal it
+      if(risk==='risky'&&enemiesLeft.length===0){
+        chosen=bestTen;
+        play(p,chosen);return;
+      }
+      // Risky and ALL remaining enemies are known void in lead suit → they must trump
+      // Only safe if we're already winning with trump
+      const tm0=Object.fromEntries(G.trick.map(t=>[t.player,t]));
+      const wi0=trickWinner(tm0,G.leadSuit);
+      const winCard0=G.trick[wi0].card;
+      if(risk==='risky'&&winCard0.suit===G.trump&&enemiesLeft.every(e=>isKnownVoid(e,G.leadSuit))){
+        chosen=bestTen;
+        play(p,chosen);return;
+      }
+      // Risky — hold the 10, fall through to conservative play
+    }
+
+    // ── Priority rule 2: Play a winning 10 only when last to play ──
+    // Last to play = zero uncertainty, guaranteed win
+    if(tens.length>0 && isLastToPlay){
+      const winningTens=tens.filter(i=>canBeat(h[i],G.leadSuit));
+      if(winningTens.length>0){
+        const trumpWinTen=winningTens.filter(i=>h[i].suit===G.trump);
+        chosen=trumpWinTen.length>0?trumpWinTen[0]:winningTens[0];
+        play(p,chosen);return;
+      }
+    }
+
+    // ── Void-suit trump opportunity ──
+    // Bot is void in the lead suit and can freely play trump.
+    const currentTM=Object.fromEntries(G.trick.map(t=>[t.player,t]));
+    const currentWI=trickWinner(currentTM,G.leadSuit);
+    const currentLeadCard=G.trick[currentWI].card;
+    const currentLeadRank=rv(currentLeadCard.rank);
+    // A high lead card (J/Q/K/A = rank ≥ 11) is a magnet for opponent 10s:
+    // remaining players may pile a 10 on top since they can't beat the high card anyway,
+    // handing themselves a free Dol. By trumping in now, we:
+    //  (a) prevent opponent 10s from claiming a Dol on a high-card stack, OR
+    //  (b) potentially allow our teammate (still to play) to add their 10 to OUR winning stack
+    const highCardMagnet=currentLeadRank>=11 && !isLastToPlay;
+
+    // ── Pre-compute: is the last remaining player an enemy who might piggyback? ──
+    const lastPlayer=playersLeft.length>0?playersLeft[playersLeft.length-1]:null;
+    const lastPlayerIsEnemy=lastPlayer!==null&&(isOpp?(lastPlayer===0||lastPlayer===1):(lastPlayer===2||lastPlayer===3));
+    // A low current winner (≤9, non-trump) is a free piggyback invitation for the last player
+    const lowWinnerPiggybackRisk=currentLeadRank<=9&&!trickHasTen&&lastPlayerIsEnemy&&!isLastToPlay;
+
+    if(voidInLeadSuit && trumps.length>0){
+      if(trickHasTen && !myTeamWinning){
+        // Dol already in stack, opponents winning — trump in with lowest trump to take it
+        chosen=lowest(h,trumps);
+        play(p,chosen);return;
+      }
+      if(!trickHasTen && (highCardMagnet||lowWinnerPiggybackRisk) && !myTeamWinning){
+        // High card OR low card with enemy last to play — both invite a 10 piggyback.
+        // Trump in now to deny the free Dol. The enemy's 10 can't beat our trump.
+        chosen=lowest(h,trumps);
+        play(p,chosen);return;
+      }
+      if(trickHasTen && myTeamWinning){
+        // Team winning a Dol — check if an enemy later can over-trump us
+        // If current winner is non-trump and any enemy is void, they could trump
+        const currentWinnerCard=G.trick[trickWinner(Object.fromEntries(G.trick.map(t=>[t.player,t])),G.leadSuit)].card;
+        const enemiesCanOverTrump=!currentWinnerCard||(currentWinnerCard.suit!==G.trump&&
+          playersLeft.some(pl=>(isOpp?(pl===0||pl===1):(pl===2||pl===3))&&isKnownVoid(pl,G.leadSuit)));
+        if(enemiesCanOverTrump&&trumps.length>0){
+          // Protect the Dol — trump in to prevent over-trump steal
+          chosen=lowest(h,trumps);
+          play(p,chosen);return;
+        }
+      }
+      // No 10 at stake, no high-card threat, team winning — fall through, save trump
+    }
+
+    // Useful card categories for tactics
+    const facePi=pi.filter(i=>h[i]&&rv(h[i].rank)>=11); // J,Q,K,A
+    const nonTrumpFace=facePi.filter(i=>h[i].suit!==G.trump);
+
+    // Current best rank in the trick
+    const tm2=Object.fromEntries(G.trick.map(t=>[t.player,t]));
+    const wi2=trickWinner(tm2,G.leadSuit);
+    const currentBestRank=rv(G.trick[wi2].card.rank);
+    const dolVulnerable=trickHasTen && currentBestRank<=9 && !isLastToPlay;
+
+    // ── Second hand low / Third hand high ──
+    // Position 1 (second to play): play conservatively, let trick develop
+    // Position 2 (third to play): play high if team isn't winning
+    const trickPos=myPosition(p); // 0=first,1=second,2=third,3=last
+    const secondHandLow=trickPos===1 && !trickHasTen && !myTeamWinning;
+    const thirdHandHigh=trickPos===2 && !myTeamWinning && !trickHasTen;
+
+    // ── Partner signal reading ──
+    const partnerHighLead=partnerLeadingHigh();
+    const partnerLowLead=partnerLeadingLow();
+
+    // ── Duck play assessment ──
+    const safeLead2=h.filter(c=>c.suit!==G.trump&&c.rank!=='10').length;
+    const dangerousToLead=safeLead2<=2 && !trickHasTen;
+    const duckWorthIt=dangerousToLead && !myTeamWinning && !trickHasTen && !isLastToPlay;
+
+    // ── Score proximity awareness ──
+    // If opponents are 1-2 pts from winning, treat every Inn as critical
+    const criticalScore=scorePressure.critical && !trickHasTen;
+    // If we're sacrificing the round (comfortably ahead), play minimal effort
+    const goingQuiet=sacrificeMode && !trickHasTen && !facingSweep;
+
+    // ── Throw-in play ──
+    // Deliberately give lead to an enemy with no good cards
+    // Done by playing just above their current winner so they're forced to lead back
+    // Throw-in: can also work second-to-last if the last player is our ally
+    const lastToPlayIsAlly=playersLeft.length===1&&(isOpp?(playersLeft[0]===2||playersLeft[0]===3):(playersLeft[0]===0||playersLeft[0]===1));
+    const throwInAvailable=throwIn!==null && !trickHasTen && (isLastToPlay||lastToPlayIsAlly);
+
+    // ── Trump promotion ──
+    // Void in lead suit: if we have mid-trumps, consider over-ruffing to promote them
+    const promotionRuff=voidInLeadSuit && ruffPromotion && trumps.length>0 && !myTeamWinning;
+
+    // ── Attitude signal: has enemy signaled weakness in lead suit? ──
+    const enemyTeam=isOpp?[0,1]:[2,3];
+    const enemySignaledWeak=G.leadSuit&&enemyTeam.some(pl=>opponentSignaledWeaknessIn(pl,G.leadSuit));
+    // If enemy signaled weakness in this suit, it's safer to win it
+    const suitSafeToWin=enemySignaledWeak&&!trickHasTen;
+
+    // ── Sacrifice Inn for trump preservation ──
+    // If winning this Inn requires our last trump, let it go
+    const myTrumpsLeft=h.filter(c=>c.suit===G.trump).length;
+    const lastTrumpSacrifice=!trickHasTen && myTrumpsLeft<=1 && !isLastToPlay && tensRemaining>0;
+
+    // ── Covering honours ──
+    // If opponent led a face card (J/Q/K), cover it with our higher face card
+    // to force out their top cards early
+    if(!myTeamWinning&&G.trick.length>0){
+      const ledCard=G.trick[0].card;
+      const enemies2=isOpp?[0,1]:[2,3];
+      const ledByEnemy=enemies2.includes(G.trick[0].player);
+      if(ledByEnemy&&rv(ledCard.rank)>=11&&rv(ledCard.rank)<=13){
+        const cover=shouldCoverHonour(h,pi,G.leadSuit);
+        if(cover!==null&&pi.includes(cover)&&h[cover]&&h[cover].rank!=='10'){
+          chosen=cover;
+          // Don't early-return — let safety nets apply
+        }
+      }
+    }
+
+    // ── Dol Protection tactic ──
+    // If there's a 10 in the stack and the current winning card is low enough
+    // that an opponent's 10 could steal it, raise the bar with a face card
+    // so only something higher than J can win — protecting our Dol
+    if(trickHasTen && !myTeamWinning && !isLastToPlay){
+      // Opponents are winning a Dol stack — fight with cheapest winning card
+      const cheap=cheapestWin(h,pi,G.leadSuit);
+      if(cheap!==null){
+        // Prefer a non-trump winning card to conserve trump
+        const cheapNonTrump=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+        chosen=cheapNonTrump!==null?cheapNonTrump:cheap;
+        // Don't use a 10 to win a 10 if we have another option
+        if(h[chosen]&&h[chosen].rank==='10'){
+          const nonTenWin=cheapestWin(h,nonTens,G.leadSuit);
+          if(nonTenWin!==null)chosen=nonTenWin;
+        }
+      } else {
+        chosen=lowestNonTen(h,pi);
+      }
+    }
+
+    // ── Dol vulnerability tactic ──
+    // Stack has a 10, current winner is low (rank ≤ 9) and we're not last.
+    // An opponent could steal with their own 10. Raise the winning bar.
+    else if(dolVulnerable && myTeamWinning){
+      if(nonTrumpFace.length>0){
+        // Use cheapest non-trump face card
+        const cheapFace=nonTrumpFace.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+        chosen=cheapFace;
+      } else {
+        // No face card — at least play a 9 if available (beats 8 or lower current winner)
+        const nines=pi.filter(i=>h[i]&&h[i].rank==='9'&&h[i].suit!==G.trump&&h[i].rank!=='10');
+        if(nines.length>0)chosen=nines[0];
+        // else fall through — no good option
+      }
+    }
+
+    // ── Scenario A: My team is already winning ──
+    else if(myTeamWinning){
+      if(isLastToPlay){
+        // Last to play, team winning — dump lowest non-10 to preserve good cards
+        chosen=lowestNonTen(h,pi);
+      } else {
+        if(trickHasTen){
+          // Stack has a 10 — dump lowest non-trump non-10 to stay safe
+          chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:nonTens.length>0?nonTens:pi);
+        } else {
+          // No 10 at stake — dump lowest non-trump non-10 (conserve trump AND 10)
+          const safeDump=nonTrumpNonTen.length>0
+            ?lowestNonTen(h,nonTrumpNonTen)
+            :lowestNonTen(h,pi.filter(i=>h[i]&&h[i].rank!=='10'&&h[i].suit!==G.trump));
+          // Never dump a 10 when team is already winning
+          chosen=safeDump!==undefined?safeDump:lowest(h,pi.filter(i=>h[i]&&h[i].rank!=='10'))||lowest(h,pi);
+        }
+      }
+    }
+
+    // ── Scenario B: Opponents are winning, no 10 in stack ──
+    else {
+      const cheap=cheapestWin(h,pi,G.leadSuit);
+
+      // ── Anti-piggyback raise ──
+      // Last player is an enemy (ally of opponent team), current winner is low (≤9),
+      // no 10 yet — enemy will almost certainly piggyback a 10 as last player.
+      // If we can WIN the trick with a face card, do it now so enemy's 10 can't win.
+      // If we can't win but have a face card that raises the bar above 10 (J/Q/K),
+      // play it — even if we lose, the enemy's 10 won't win either (J > 10).
+      if(lowWinnerPiggybackRisk && !goingQuiet && !sacrificeMode){
+        if(cheap!==null){
+          // We CAN win — take the trick to deny the piggyback entirely
+          const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+          chosen=cheapNT!==null?cheapNT:cheap;
+          play(p,chosen);return;
+        } else {
+          // We can't win — but if we have a face card (J/Q/K) in the lead suit,
+          // play it to raise the bar above 10. Enemy's 10 will still lose to our face card.
+          const faceInSuit=pi.filter(i=>h[i]&&h[i].suit===G.leadSuit&&rv(h[i].rank)>=11&&h[i].rank!=='10');
+          if(faceInSuit.length>0){
+            // Play cheapest face card that beats the current winner
+            const beats=faceInSuit.filter(i=>canBeat(h[i],G.leadSuit));
+            if(beats.length>0){
+              chosen=beats.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+              play(p,chosen);return;
+            }
+          }
+        }
+      }
+
+      // Going quiet (sacrifice round) → play lowest, conserve resources
+      if(goingQuiet){
+        chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi);
+      }
+      // Critical score → fight for every Inn aggressively
+      else if(criticalScore && cheap!==null){
+        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+        chosen=cheapNT!==null?cheapNT:cheap;
+      }
+      // Suit safe to win (enemy signaled weakness) → take it cheaply
+      else if(suitSafeToWin && cheap!==null){
+        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+        chosen=cheapNT!==null?cheapNT:cheap;
+      }
+      // Trump promotion: over-ruff with mid-trump to promote
+      else if(promotionRuff && trumps.length>0){
+        // Use cheapest trump that beats current winner to promote mid-trumps
+        const promTrump=cheapestWin(h,trumps,G.leadSuit);
+        if(promTrump!==null)chosen=promTrump;
+      }
+      // Partner leading high → play low, let partner win cleanly
+      else if(partnerHighLead && G.trick.length>0){
+        chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi);
+      }
+      // Partner leading LOW → they're weak in this suit, don't over-commit
+      // If we can't win cheaply, play low and wait for a better opportunity
+      else if(partnerLowLead && !trickHasTen && cheap!==null){
+        // Only take trick cheaply — don't burn a high card
+        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump&&rv(h[i].rank)<=9),G.leadSuit);
+        if(cheapNT!==null)chosen=cheapNT;
+        else{const dump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);chosen=dump!==undefined?dump:lowest(h,pi);}
+      }
+      // Second hand low → don't over-commit early
+      else if(secondHandLow){
+        // Exception: if the enemy lead is very low (≤6), winning cheaply is fine
+        // since we won't be over-committing against a garbage lead
+        const ledRank=G.trick.length>0?rv(G.trick[0].card.rank):0;
+        if(ledRank<=6&&cheap!==null){
+          const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump&&rv(h[i].rank)<=9),G.leadSuit);
+          chosen=cheapNT!==null?cheapNT:(rv(h[cheap].rank)<=9&&h[cheap].suit!==G.trump?cheap:(lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi)));
+        } else {
+          const safeDump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);
+          chosen=safeDump!==undefined?safeDump:lowest(h,pi);
+        }
+      }
+      // Sacrifice last trump for Inn → not worth it
+      // BUT: never sacrifice a 10 to preserve trump — that gives away real points
+      else if(lastTrumpSacrifice && cheap!==null && h[cheap]&&h[cheap].suit===G.trump){
+        const nonTrumpWin=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+        // Dump lowest non-trump non-10 — if none exist, use the trump (don't dump the 10)
+        const safeDump=nonTrumpNonTen.length>0?lowestNonTen(h,nonTrumpNonTen):undefined;
+        if(nonTrumpWin!==null)chosen=nonTrumpWin;
+        else if(safeDump!==undefined)chosen=safeDump;
+        else chosen=cheap; // only option left is trump — use it, never the 10
+      }
+      // Duck play → deliberately lose to avoid bad lead position
+      else if(duckWorthIt){
+        const safeDump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);
+        chosen=safeDump!==undefined?safeDump:lowest(h,pi);
+      }
+      // Endgame defensive → can afford to lose, play lowest
+      else if(endgameDefensive && !facingSweep){
+        chosen=lowestNonTen(h,pi)||lowest(h,pi);
+      }
+      // Sacrifice Dol prevention → facing 0-4 sweep, fight for any ten
+      else if(facingSweep){
+        // Desperate: use any card that can win, even trump, to avoid 0-4
+        const anyWin=cheapestWin(h,pi,G.leadSuit);
+        chosen=anyWin!==null?anyWin:(lowestNonTen(h,pi)||lowest(h,pi));
+      }
+      // Post-tens mode → strategic Inn collection
+      else if(postTensMode){
+        if(cheap!==null){
+          // All tens played — win Inns for tiebreaker
+          // But prefer non-trump wins to preserve trump for guaranteed wins later
+          const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+          chosen=cheapNT!==null?cheapNT:cheap;
+        } else {
+          // Can't win — dump absolute lowest, save any trump for future control
+          chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi);
+        }
+      }
+      // Third hand high / endgame aggressive → go for the win
+      else if((thirdHandHigh||endgameAggressive) && cheap!==null){
+        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+        chosen=cheapNT!==null?cheapNT:cheap;
+      }
+      else if(cheap!==null && isLastToPlay){
+        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+        chosen=cheapNT!==null?cheapNT:cheap;
+      } else if(cheap!==null && !isLastToPlay){
+        const cheapCard=h[cheap];
+        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump&&rv(h[i].rank)<=9),G.leadSuit);
+        if(cheapNT!==null){
+          chosen=cheapNT;
+        } else if(rv(cheapCard.rank)<=9 && cheapCard.suit!==G.trump){
+          chosen=cheap;
+        } else {
+          const safeDump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);
+          chosen=safeDump!==undefined?safeDump:lowest(h,pi);
+        }
+      } else {
+        const safeDump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:nonTens.length>0?nonTens:pi);
+        chosen=safeDump!==undefined?safeDump:lowest(h,pi);
+      }
+
+      // Safety: never dump a 10 when losing unless it's the only card
+      if(h[chosen]&&h[chosen].rank==='10'&&nonTens.length>0&&nonTens.some(i=>pi.includes(i))){
+        const safeNonTen=lowestNonTen(h,pi.filter(i=>h[i]&&h[i].rank!=='10'));
+        if(safeNonTen!==undefined&&pi.includes(safeNonTen))chosen=safeNonTen;
+      }
+    }
+
+    // ── Universal 10 safety net ──
+    // If we ended up choosing a 10 and the risk is not 'safe', swap it out
+    // Prefer using trump to win the trick over sacrificing the 10 uselessly
+    if(h[chosen]&&h[chosen].rank==='10'){
+      const risk=tenRisk(h[chosen]);
+      if(risk!=='safe'){
+        const nonTenPi=pi.filter(i=>h[i]&&h[i].rank!=='10');
+        if(nonTenPi.length>0){
+          if(myTeamWinning){
+            // Team winning — dump lowest non-trump non-10 first, then non-trump
+            const safeDump=lowestNonTen(h,nonTenPi.filter(i=>h[i].suit!==G.trump));
+            const fallback=lowestNonTen(h,nonTenPi);
+            chosen=safeDump!==undefined?safeDump:(fallback!==undefined?fallback:nonTenPi[0]);
+          } else {
+            // Team losing — try to win cheaply with non-10
+            // Prefer trump win over dumping the 10 (trump protects less than a 10 is worth losing)
+            const cheapNonTen=cheapestWin(h,nonTenPi,G.leadSuit);
+            const cheapTrumpWin=cheapestWin(h,nonTenPi.filter(i=>h[i].suit===G.trump),G.leadSuit);
+            const cheapNonTrumpWin=cheapestWin(h,nonTenPi.filter(i=>h[i].suit!==G.trump),G.leadSuit);
+            if(cheapNonTrumpWin!==null)chosen=cheapNonTrumpWin; // prefer non-trump win
+            else if(cheapTrumpWin!==null)chosen=cheapTrumpWin;  // use trump to win rather than dump 10
+            else chosen=lowestNonTen(h,nonTenPi.filter(i=>h[i].suit!==G.trump))||
+                        lowestNonTen(h,nonTenPi)||nonTenPi[0]; // dump lowest non-10
+          }
+        }
+      }
+    }
+
+    // ── Trump conservation: final pass ──
+    // If we've ended up choosing a trump but don't need to, swap for a non-trump
+    // CRITICAL: never swap trump for a 10 — that sacrifices real points to save trump
+    if(h[chosen]&&h[chosen].suit===G.trump){
+      const nonTrumpPi=pi.filter(i=>h[i]&&h[i].suit!==G.trump&&h[i].rank!=='10');
+      if(nonTrumpPi.length>0){
+        const shouldSave=(!trickHasTen)||(myTeamWinning&&!isLastToPlay);
+        if(shouldSave){
+          const cheapNT=cheapestWin(h,nonTrumpPi,G.leadSuit);
+          if(cheapNT!==null)chosen=cheapNT;
+          else{const alt=lowestNonTen(h,nonTrumpPi);if(alt!==undefined)chosen=alt;}
+        }
+      }
+    }
+  }
+
+  if(chosen===undefined)chosen=pi[0]; // final safety net
+  play(p,chosen);
+}
+
+</script>
+
+  <!-- MULTIPLAYER LOBBY -->
+  <div class="screen hidden" id="mp-lobby-screen" style="gap:16px;">
+    <div class="screen-title">Play Online</div>
+    <input id="mp-name-input" placeholder="Your name" maxlength="16"
+      style="width:100%;max-width:280px;background:rgba(0,0,0,0.4);border:1px solid rgba(212,168,67,0.2);border-radius:8px;color:var(--text);font-family:'Cinzel',serif;font-size:0.85rem;padding:12px 14px;outline:none;letter-spacing:0.06em;">
+    <button class="btn" onclick="mpCreateRoom()" style="width:100%;max-width:280px;">Create Room</button>
+    <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;color:var(--dim);">— OR JOIN —</div>
+    <input id="mp-code-input" placeholder="ROOM CODE" maxlength="6"
+      style="width:100%;max-width:280px;background:rgba(0,0,0,0.4);border:1px solid rgba(212,168,67,0.2);border-radius:8px;color:var(--text);font-family:'Cinzel',serif;font-size:1.1rem;padding:12px 14px;outline:none;letter-spacing:0.3em;text-align:center;text-transform:uppercase;">
+    <button class="btn-ghost" onclick="mpJoinRoom()" style="width:100%;max-width:280px;">Join Room</button>
+    <div id="mp-lobby-error" style="font-family:'Cormorant Garamond',serif;color:#e05c4b;font-size:0.9rem;font-style:italic;min-height:1.2rem;text-align:center;"></div>
+    <button class="btn-ghost" onclick="showScreen('start-screen')" style="width:100%;max-width:280px;">Back</button>
+  </div>
+
+  <!-- WAITING ROOM -->
+  <div class="screen hidden" id="mp-wait-screen" style="gap:16px;text-align:center;">
+    <div class="screen-title">Waiting Room</div>
+    <div id="wait-code" onclick="copyRoomCode()"
+      style="font-family:'Cinzel Decorative',serif;font-size:2rem;color:var(--gold2);letter-spacing:0.25em;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.2);border-radius:10px;padding:10px 24px;cursor:pointer;">
+      ------
+    </div>
+    <div style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--dim);font-size:0.9rem;">Tap code to copy · Share with 3 friends</div>
+    <div id="wait-seats" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:320px;"></div>
+    <div id="wait-status" style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--dim);font-size:0.9rem;">Waiting...</div>
+    <button class="btn hidden" id="start-game-btn" onclick="mpStartGame()" style="width:100%;max-width:280px;">Start Game</button>
+    <button class="btn-ghost" onclick="mpLeaveRoom()" style="width:100%;max-width:280px;">Leave</button>
+  </div>
+
+</body>
+</html>
