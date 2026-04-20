@@ -819,11 +819,23 @@ function initRound(){
 
 function botPickTrump(p){
   const h=G.hands[p];
+  // Tactic 36+37: Use advanced trump scoring with position awareness
   const scores={};
   for(const s of SUITS){
-    const cnt=h.filter(c=>c.suit===s&&c.rank!=='10').length;
-    const face=h.filter(c=>c.suit===s&&rv(c.rank)>=11).length*2;
-    scores[s]=cnt+face;
+    scores[s]=scoreTrumpSuit(s,h);
+    // Bonus if ally also has length (coordination)
+    const ally=TEAMMATE[p];
+    if(G.hands[ally]){
+      const allyLen=G.hands[ally].filter(c=>c.suit===s).length;
+      if(allyLen>=3)scores[s]+=2; // combined trump length bonus
+    }
+    // Penalty for picking a suit where opponents have A-K
+    const isOppLocal=p===2||p===3;
+    const oppHasAK=[0,1,2,3].filter(e=>e!==ally&&e!==p).some(e=>
+      G.hands[e]&&G.hands[e].some(c=>c.suit===s&&c.rank==='A')&&
+      G.hands[e].some(c=>c.suit===s&&c.rank==='K')
+    );
+    if(oppHasAK)scores[s]-=3;
   }
   return Object.entries(scores).reduce((a,b)=>b[1]>a[1]?b:a)[0];
 }
@@ -1104,7 +1116,7 @@ function resolve(){
   // Record played cards + update void tracker (detect who couldn't follow suit)
   if(!G.voidTracker)G.voidTracker={};
   G.trick.forEach(t=>{
-    G.playedCards.push(t.card);
+    G.playedCards.push({...t.card,player:t.player});
     if(t.card.rank==='10')G.tensOut++;
     if(G.leadSuit&&t.card.suit!==G.leadSuit){
       recordVoid(t.player,G.leadSuit);
@@ -1427,6 +1439,22 @@ function updateVoidTracker(player,cardSuit,leadSuit){
 }
 
 // Ally's void suits (suits where ally has shown void in this round)
+
+function estimateSuitHolding(player,suit){
+  const total=13;
+  const playedBySuit=G.playedCards.filter(c=>c.suit===suit).length;
+  const inTrick=G.trick.filter(t=>t.card.suit===suit).length;
+  const inMyHand=G.hands[G.currentPlayer].filter(c=>c.suit===suit).length;
+  const remaining=total-playedBySuit-inTrick-inMyHand;
+  // Spread remaining across 3 other players roughly by their follow history
+  const playerFollows=playerFollowCount(player,suit);
+  // Players who have followed more have more of the suit (or did)
+  // Since they already played those cards, subtract from remaining estimate
+  const alreadyPlayed=G.playedCards.filter(c=>c.player===player&&c.suit===suit).length;
+  // Simple estimate: remaining / 3 other players, adjusted for known plays
+  return Math.max(0, Math.round(remaining/3) - alreadyPlayed + playerFollowCount(player,suit));
+}
+
 function allyVoids(p){
   // p = current player index; ally is always TEAMMATE[p]
   const ally=TEAMMATE[p||G.currentPlayer];
@@ -1481,14 +1509,31 @@ function nextEnemyVoidIn(suit,p,isOpp){
 // A card is a "master" if all higher cards of its suit have been played
 // (i.e. it's currently unbeatable in its suit, excluding trump)
 function isMasterCard(card,myHand){
-  if(card.suit===G.trump)return false; // handle trump separately
+
+  if(card.suit===G.trump)return false;
+
   const higherRanks=Object.keys(RV).filter(r=>rv(r)>rv(card.rank));
+
   return higherRanks.every(r=>{
+
     const played=G.playedCards.some(c=>c.suit===card.suit&&c.rank===r);
-    const inHand=myHand.some(c=>c.suit===card.suit&&c.rank===r);
+
+    const inMyHand=myHand.some(c=>c.suit===card.suit&&c.rank===r);
+
     const inTrick=G.trick.some(t=>t.card.suit===card.suit&&t.card.rank===r);
-    return played||inHand||inTrick; // accounted for — not in enemy hands
+
+    // Exact: also check all other players' actual hands
+
+    const inOtherHand=[0,1,2,3].filter(pl=>pl!==G.currentPlayer).some(pl=>
+
+      G.hands[pl]&&G.hands[pl].some(c=>c.suit===card.suit&&c.rank===r)
+
+    );
+
+    return played||inMyHand||inTrick||inOtherHand;
+
   });
+
 }
 // Get all master cards from playable indices
 function getMasters(h,pi){
@@ -1609,36 +1654,53 @@ function suitToVoidSoon(hand,trump){
 // If opponent played a specific honour when they could have played a higher one,
 // they probably didn't have the higher one → infer their holding
 function inferredLacking(player,suit,rank){
-  // If player played rank R, higher cards of same suit they played through are likely absent
+
+  // If this player has played cards of this suit but never played rank R or higher,
+
+  // they probably don't have it (restricted choice inference)
+
   const played=G.playedCards.filter(c=>c.player===player&&c.suit===suit);
+
   if(played.length===0)return false;
+
   const maxPlayed=Math.max(...played.map(c=>rv(c.rank)));
-  return maxPlayed<rv(rank); // they never played rank or higher
+
+  // They played but never played as high as rank → likely don't have it
+
+  return maxPlayed<rv(rank);
+
 }
 
 // ── Hand shape inference ──
 // Track how many times each player followed in each suit
 // If they've followed 4+ times, they have a long suit there
 function playerFollowCount(player,suit){
-  return G.playedCards.filter(c=>c.suit===suit&&G.trick&&G.trick.some&&false).length;
-  // Simplified: count how many times player played this suit historically
+
+  // Count how many times this player played this suit (now that we store player)
+
+  return G.playedCards.filter(c=>c.suit===suit&&c.player===player).length;
+
 }
 function playerLikelyLong(player,suit){
-  const timesPlayed=G.playedCards.filter((c,i)=>{
-    // Approximate: count suit plays by player from played cards
-    return c.suit===suit;
-  }).length;
-  return timesPlayed>=4;
+
+  // A player who has played 3+ cards of a suit likely started with 5+
+
+  return playerFollowCount(player,suit)>=3;
+
 }
 
 // ── Trump extraction (last trump) ──
 // After opponents' trump is depleted, masters in side suits become safe
 function opponentsTrumpExhausted(isOpp){
-  const trumpPlayed=G.playedCards.filter(c=>c.suit===G.trump).length;
-  const myTrump=G.hands[G.currentPlayer].filter(c=>c.suit===G.trump).length;
-  const trickTrump=G.trick.filter(t=>t.card.suit===G.trump).length;
-  const remaining=13-trumpPlayed-myTrump-trickTrump;
-  return remaining<=1; // essentially exhausted
+
+  // Exact: check if any enemy actually holds trump
+
+  const enemies=isOpp?[0,1]:[2,3];
+
+  const anyHasTrump=enemies.some(e=>G.hands[e]&&G.hands[e].some(c=>c.suit===G.trump));
+
+  return !anyHasTrump;
+
 }
 
 // ── All-trump / No-trump hand detection ──
@@ -1715,9 +1777,13 @@ function opponentSignaledWeaknessIn(player,suit){
 // ── Ruff and discard avoidance ──
 // Never lead a suit if both opponents are void in it (gives them ruff-and-discard)
 function ruffAndDiscardDanger(suit,isOpp){
+
   const enemies=isOpp?[0,1]:[2,3];
+
   const bothVoid=enemies.every(e=>isKnownVoid(e,suit));
+
   return bothVoid;
+
 }
 
 // ── Helper: can this card beat the current best card in the trick?
@@ -1771,87 +1837,357 @@ function cheapestWin(h,pi,ls){
   return winners.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
 }
 
+// ══════════════════════════════════════════════════
+// ── ADVANCED TACTIC HELPERS ──
+// ══════════════════════════════════════════════════
+
+// Exact trump count for a specific player
+function exactTrumpCount(player){
+  return G.hands[player]?G.hands[player].filter(c=>c.suit===G.trump).length:0;
+}
+
+// Exact suit count for a specific player
+function exactSuitCount(player,suit){
+  return G.hands[player]?G.hands[player].filter(c=>c.suit===suit).length:0;
+}
+
+// Does player hold a specific card?
+function playerHasCard(player,suit,rank){
+  return G.hands[player]&&G.hands[player].some(c=>c.suit===suit&&c.rank===rank);
+}
+
+// What is the highest card of a suit remaining in enemy hands?
+function highestEnemyCardInSuit(suit,isOpp){
+  const enemies=isOpp?[0,1]:[2,3];
+  let best=0;
+  for(const e of enemies){
+    if(!G.hands[e])continue;
+    for(const c of G.hands[e]){
+      if(c.suit===suit&&rv(c.rank)>best)best=rv(c.rank);
+    }
+  }
+  return best;
+}
+
+// Does ally have a card in this suit that can win the trick after me?
+function allyCanWinSuit(ally,suit,myHand){
+  if(!G.hands[ally])return false;
+  const allyCards=G.hands[ally].filter(c=>c.suit===suit);
+  if(!allyCards.length)return false;
+  // Check if ally's highest in suit beats current best
+  const best=allyCards.reduce((a,b)=>rv(b.rank)>rv(a.rank)?b:a);
+  return canBeat(best,suit);
+}
+
+// ── Perfect endgame calculation (last 2 tricks) ──
+// With 2 tricks left and all hands visible, determine exact best play
+function perfectEndgame(p,pi,h,isOpp){
+  if(G.tricks<11)return null; // only last 2 tricks
+  const myTens=G.yourTens,oppTens=G.theirTens;
+  // If we have a ten in hand and can guarantee winning a trick with it, do so
+  const myTenIdx=pi.find(i=>h[i]&&h[i].rank==='10');
+  if(myTenIdx!==undefined){
+    if(canBeat(h[myTenIdx],G.leadSuit)){
+      // We have a winning ten — play it for guaranteed Dol
+      return myTenIdx;
+    }
+  }
+  return null;
+}
+
+// ── Inn tiebreaker exact calculation ──
+// When all 4 tens placed and it's 2-2 tie, count exact Inns each team will win
+function exactInnAdvantage(isOpp){
+  const tricksLeft=13-G.tricks;
+  if(tricksLeft===0)return 0;
+  // Count team's winning cards remaining
+  const me=G.currentPlayer;
+  const ally=TEAMMATE[me];
+  const enemies=isOpp?[0,1]:[2,3];
+  let myTeamWins=0;
+  // Simplified: count masters in our hands
+  const myHand=G.hands[me]||[];
+  const allyHand=G.hands[ally]||[];
+  for(const c of [...myHand,...allyHand]){
+    if(c.rank!=='10'&&isMasterCard(c,[...myHand,...allyHand]))myTeamWins++;
+  }
+  return myTeamWins;
+}
+
+// ── Trump echo detection ──
+// Do we hold A-K of trump? Lead A then K to clear all opponent trump in 2 tricks
+function hasTrumpEcho(h){
+  const hasA=h.some(c=>c.suit===G.trump&&c.rank==='A');
+  const hasK=h.some(c=>c.suit===G.trump&&c.rank==='K');
+  const trumpCount=h.filter(c=>c.suit===G.trump).length;
+  // Only echo if we have overwhelming trump strength (5+)
+  // A+K alone depletes our two best trump for little gain
+  return hasA&&hasK&&trumpCount>=5;
+}
+
+// Are we in the second step of a trump echo? (just played A, now lead K)
+function trumpEchoSecondStep(h,isOpp){
+  if(!hasTrumpEcho(h))return false;
+  // Did we lead trump Ace last trick?
+  const lastTrump=G.playedCards.slice(-4).find(c=>c.suit===G.trump&&c.rank==='A'&&c.player===G.currentPlayer);
+  return!!lastTrump;
+}
+
+// ── Uppercut detection ──
+// Void in lead suit, have a mid-trump (9-Q), play it to force opponent 
+// to over-ruff with a high trump, promoting our remaining mid-trumps
+function canUppercut(h,pi,isOpp){
+  if(!h.some(c=>c.suit===G.leadSuit)||G.trick.length===0)return null;
+  // We must be void in lead suit already (voidInLeadSuit)
+  const midTrumps=pi.filter(i=>h[i]&&h[i].suit===G.trump&&rv(h[i].rank)>=9&&rv(h[i].rank)<=12&&h[i].rank!=='10');
+  if(!midTrumps.length)return null;
+  // Is an enemy currently winning with a mid-trump?
+  const tm=Object.fromEntries(G.trick.map(t=>[t.player,t]));
+  const wi=trickWinner(tm,G.leadSuit);
+  const winCard=G.trick[wi].card;
+  const enemies=isOpp?[0,1]:[2,3];
+  const enemyWinning=enemies.includes(G.trick[wi].player);
+  if(!enemyWinning)return null;
+  // Enemy winning with a mid-trump — overruff forces them higher, promoting ours
+  const overruff=midTrumps.filter(i=>canBeat(h[i],G.leadSuit));
+  if(!overruff.length)return null;
+  return overruff.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b); // cheapest overruff
+}
+
+// ── Avoidance play ──
+// Choose which card to win WITH, ensuring the dangerous opponent (with trump/ten)
+// does NOT get the next lead
+function avoidanceLead(h,pi,isOpp){
+  if(!pi.length)return null;
+  const enemies=isOpp?[0,1]:[2,3];
+  // Which enemy is dangerous? (has trump or a ten)
+  const dangerous=enemies.filter(e=>
+    G.hands[e]&&(G.hands[e].some(c=>c.suit===G.trump)||G.hands[e].some(c=>c.rank==='10'))
+  );
+  if(!dangerous.length)return null;
+  // If the dangerous player is NOT next to play, winning is fine
+  const myIdx=ORDER.indexOf(G.currentPlayer);
+  const nextPlayer=ORDER[(myIdx+1)%4];
+  if(!dangerous.includes(nextPlayer))return null;
+  // Dangerous player is next — try to win at a rank that forces them to lead into us
+  // Best: play our lowest winner so dangerous player leads from weakness next trick
+  return cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+}
+
+// ── Hold-up play ──
+// Deliberately duck (don't win) when enemy leads their master, to exhaust their entries
+function shouldHoldUp(h,pi,isOpp){
+  if(G.trick.length===0)return false;
+  const enemies=isOpp?[0,1]:[2,3];
+  const ledByEnemy=enemies.includes(G.trick[0].player);
+  if(!ledByEnemy)return false;
+  // Enemy led their master (A or K with A played)
+  const ledCard=G.trick[0].card;
+  const ledRank=rv(ledCard.rank);
+  if(ledRank<13)return false; // not a top honour
+  // We have a winner but holding up might strand their suit
+  const myWinner=cheapestWin(h,pi,G.leadSuit);
+  if(myWinner===null)return false;
+  // Hold up if: we have 2+ stoppers in this suit (can duck once and still have control)
+  const myCardsInSuit=pi.filter(i=>h[i]&&h[i].suit===G.leadSuit&&h[i].rank!=='10');
+  return myCardsInSuit.length>=2;
+}
+
+// ── Forcing ally to lead ──
+// Deliberately lose a trick to hand lead to ally who can execute better
+function shouldForceAllyLead(h,pi,isOpp){
+  const ally=TEAMMATE[G.currentPlayer];
+  if(!G.hands[ally])return false;
+  // Is ally's hand clearly stronger? (has an Ace or master we don't have)
+  const allyHasMaster=G.hands[ally].some(c=>c.rank!=='10'&&isMasterCard(c,G.hands[ally]));
+  const iHaveMaster=pi.some(i=>h[i]&&h[i].rank!=='10'&&isMasterCard(h[i],h));
+  return allyHasMaster&&!iHaveMaster;
+}
+
+// ── Trump tap ──
+// Lead a suit ally can ruff (is void in) repeatedly to drain enemy trump
+function trumpTapSuit(h,pi,isOpp){
+  const ally=TEAMMATE[G.currentPlayer];
+  if(!G.hands[ally])return null;
+  // Find a suit ally is void in (they'll ruff = tap enemy trump)
+  for(const s of SUITS){
+    if(s===G.trump)continue;
+    const allyVoidInSuit=!G.hands[ally].some(c=>c.suit===s);
+    if(!allyVoidInSuit)continue;
+    // We have cards in this suit to lead
+    const leads=pi.filter(i=>h[i]&&h[i].suit===s&&h[i].rank!=='10');
+    if(!leads.length)continue;
+    // Don't lead if both enemies are also void (ruff-and-discard)
+    const enemies=isOpp?[0,1]:[2,3];
+    const bothEnemiesVoid=enemies.every(e=>!G.hands[e]||!G.hands[e].some(c=>c.suit===s));
+    if(bothEnemiesVoid)continue;
+    return leads.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+  }
+  return null;
+}
+
+// ── Trump endplay ──
+// Give enemy the lead when they only have trump left → forces them to lead into us
+function isTrumpEndplay(isOpp){
+  const enemies=isOpp?[0,1]:[2,3];
+  return enemies.some(e=>{
+    if(!G.hands[e])return false;
+    const nonTrump=G.hands[e].filter(c=>c.suit!==G.trump&&c.rank!=='10');
+    const trump=G.hands[e].filter(c=>c.suit===G.trump);
+    return nonTrump.length===0&&trump.length>0; // only trump left
+  });
+}
+
+// ── Vienna Coup ──
+// Cash a master in a side suit to unblock for a squeeze or endplay
+function viennaCoupCard(h,pi,isOpp){
+  // Find a master we should cash NOW before endgame (tricks 10-12)
+  if(G.tricks<9)return null;
+  const masters=getMasters(h,pi).filter(i=>h[i]&&h[i].suit!==G.trump&&h[i].rank!=='10');
+  if(!masters.length)return null;
+  // Cash the master that unblocks our hand — highest master in shortest suit
+  const sorted=[...masters].sort((a,b)=>{
+    const cntA=h.filter(c=>c.suit===h[a].suit).length;
+    const cntB=h.filter(c=>c.suit===h[b].suit).length;
+    return cntA-cntB; // shortest suit first
+  });
+  return sorted[0];
+}
+
+// ── Protected ten ──
+// We hold a ten AND a higher card in same suit — the ten is "protected"
+// Never lead the ten; play high card first when forced to follow
+function hasProtectedTen(h,pi,suit){
+  const tenIdx=pi.find(i=>h[i]&&h[i].suit===suit&&h[i].rank==='10');
+  if(tenIdx===undefined)return null;
+  const higher=pi.find(i=>h[i]&&h[i].suit===suit&&rv(h[i].rank)>10&&h[i].rank!=='10');
+  return higher!==undefined?higher:null; // return the protecting card index
+}
+
+// ── Exact suit distribution ──
+// How many of this suit does each player hold exactly?
+function suitDistribution(suit){
+  const dist={};
+  for(let pl=0;pl<4;pl++){
+    dist[pl]=G.hands[pl]?G.hands[pl].filter(c=>c.suit===suit).length:0;
+  }
+  return dist;
+}
+
+// ── Squeeze setup ──
+// In late game, play to squeeze an opponent who must protect two suits
+function canSqueeze(isOpp,h,pi){
+  if(G.tricks<9)return null;
+  const enemies=isOpp?[0,1]:[2,3];
+  // Find enemy who holds winners in 2+ suits (they must guard both)
+  for(const e of enemies){
+    if(!G.hands[e])continue;
+    const guardedSuits=SUITS.filter(s=>{
+      if(s===G.trump)return false;
+      return G.hands[e].some(c=>c.suit===s&&rv(c.rank)>=12); // K or A
+    });
+    if(guardedSuits.length>=2){
+      // This enemy is squeezed if we cash masters — find our squeeze card
+      const squeezeLead=pi.filter(i=>h[i]&&h[i].suit!==G.trump&&h[i].rank!=='10'&&
+        isMasterCard(h[i],h));
+      if(squeezeLead.length)return squeezeLead[0];
+    }
+  }
+  return null;
+}
+
+// ── Suit preference signal ──  
+// When we have a choice of equivalent safe leads, pick suit to signal to ally
+function suitPreferenceLead(h,pi,isOpp){
+  const safeOpts=pi.filter(i=>h[i]&&h[i].rank!=='10'&&h[i].suit!==G.trump);
+  if(safeOpts.length<2)return null;
+  const ally=TEAMMATE[G.currentPlayer];
+  if(!G.hands[ally])return null;
+  // Prefer leading a suit where ally has good cards (K or A)
+  const allyStrong=SUITS.filter(s=>s!==G.trump&&G.hands[ally].some(c=>c.suit===s&&rv(c.rank)>=13));
+  const preferredLeads=safeOpts.filter(i=>allyStrong.includes(h[i].suit));
+  if(preferredLeads.length>0)return preferredLeads.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+  return null;
+}
+
+// ── Better trump selection ──
+// Evaluate each suit as trump candidate more precisely
+function scoreTrumpSuit(suit,hand){
+  const cards=hand.filter(c=>c.suit===suit);
+  let score=0;
+  // Length bonus
+  score+=cards.length*2;
+  // Top honours (A,K guarantee tricks)
+  if(cards.some(c=>c.rank==='A'))score+=4;
+  if(cards.some(c=>c.rank==='K'))score+=3;
+  if(cards.some(c=>c.rank==='Q'))score+=2;
+  // Penalty for no 10 (10 should be used, not led as trump)
+  if(!cards.some(c=>c.rank==='10'))score+=1;
+  // A-K combination (guaranteed 2 trump tricks)
+  if(cards.some(c=>c.rank==='A')&&cards.some(c=>c.rank==='K'))score+=3;
+  return score;
+}
+
 function botPlay(){
   const p=G.currentPlayer;
   const h=G.hands[p];
-  const isOpp=p===2||p===3; // opponents = 2,3; your team = 0,1
+  const isOpp=p===2||p===3;
 
-  // Build playable card indices (must follow lead suit if possible)
+  // Build playable indices
   let pi=[];
   let voidInLeadSuit=false;
   if(G.leadSuit){
     const follow=h.map((c,i)=>c.suit===G.leadSuit?i:-1).filter(i=>i>=0);
-    if(follow.length>0){
-      pi=follow;
-    } else {
-      // Bot is VOID in lead suit — can play anything including trump
-      pi=h.map((_,i)=>i);
-      voidInLeadSuit=true;
-    }
-  } else {
-    pi=h.map((_,i)=>i);
-  }
+    if(follow.length>0){pi=follow;}
+    else{pi=h.map((_,i)=>i);voidInLeadSuit=true;}
+  } else {pi=h.map((_,i)=>i);}
 
-  // Separate useful card categories from playable set
   const tens=pi.filter(i=>h[i].rank==='10');
   const trumps=pi.filter(i=>h[i].suit===G.trump&&h[i].rank!=='10');
   const nonTens=pi.filter(i=>h[i].rank!=='10');
   const nonTrumpNonTen=pi.filter(i=>h[i].suit!==G.trump&&h[i].rank!=='10');
 
-  let chosen=lowest(h,pi); // safe fallback
+  let chosen=lowest(h,pi);
 
-  // ── Late-game score awareness ──
-  const myTotalDols=isOpp?G.theirTens:G.yourTens;   // individual 10s for strategy
+  // ── Score / game state ──
+  const myTotalDols=isOpp?G.theirTens:G.yourTens;
   const oppTotalDols=isOpp?G.yourTens:G.theirTens;
-  const tensRemaining=4-G.tensOut; // how many 10s are still in play
+  const tensRemaining=4-G.tensOut;
   const tricksLeft=13-G.tricks;
-  // Behind with few tricks left = play aggressively (take risks for Dols)
-  const desperateModeOn=oppTotalDols>myTotalDols && tricksLeft<=4 && tensRemaining>0;
-  // Comfortably ahead = protect lead, be conservative
-  // 3+ tens vs 0 = near certain win, just don't blow it
-  const conservativeModeOn=myTotalDols>=3 && oppTotalDols===0;
-
-  // ── Endgame exact calculation ──
-  // With 3 or fewer tricks left, calculate exactly what we need
+  const desperateModeOn=oppTotalDols>myTotalDols&&tricksLeft<=4&&tensRemaining>0;
+  const conservativeModeOn=myTotalDols>=3&&oppTotalDols===0;
   const endgame=tricksLeft<=3;
   const needDolToTie=oppTotalDols>myTotalDols&&oppTotalDols-myTotalDols<=tensRemaining;
-  const needDolToWin=needDolToTie&&myTotalDols+tensRemaining>oppTotalDols;
   const canAffordToLose=myTotalDols>oppTotalDols&&myTotalDols-oppTotalDols>tensRemaining;
-  // In endgame: if we can afford to lose all remaining tens and still win → play defensively
-  // If we need a specific ten → play maximally aggressively on Dol tricks
   const endgameAggressive=endgame&&needDolToTie&&tensRemaining>0;
   const endgameDefensive=endgame&&canAffordToLose;
-
-  // ── Post-tens mode: all 10s played → pure Inn tiebreaker ──
   const postTensMode=allTensPlayed();
-
-  // ── Trump Decider suit: avoid leading into it as opponents ──
-  // Decider's team chose trump for a reason — they're strong in it
-  const avoidTrumpDeciderSuit=isTrumpDeciderSuit(G.trump); // already trump, always avoided as non-trump lead
-
-  // ── Ally's known voids (for cross-ruff coordination) ──
-  const myAllyVoids=allyVoids(p);
-  const crossRuffPossible=myAllyVoids.size>0&&h.some(c=>myAllyVoids.has(c.suit)&&c.suit!==G.trump);
-
-  // ── Sacrifice Dol prevention (avoid 0-4 sweep) ──
-  // If opponents have 3 tens and we have 0, desperately fight for 1
+  const enemies=isOpp?[0,1]:[2,3];
+  const enemyHasTenInHand=enemies.some(e=>G.hands[e]&&G.hands[e].some(c=>c.rank==='10'));
+  const noEnemyTenThreat=!enemyHasTenInHand&&tensRemaining>0;
+  const anyEnemyHasTrump=enemies.some(e=>G.hands[e]&&G.hands[e].some(c=>c.suit===G.trump));
   const facingSweep=oppTotalDols>=3&&myTotalDols===0&&tensRemaining>0;
 
-  // ── Master cards ──
+  // ── Partnership context ──
+  const ally=TEAMMATE[p];
+  const allyHasTen=G.hands[ally]&&G.hands[ally].some(c=>c.rank==='10');
+  const allyHasTrump=G.hands[ally]&&G.hands[ally].some(c=>c.suit===G.trump);
+  // Tactic 22: use exact ally hand knowledge
+  const allyMasters=G.hands[ally]?getMasters(G.hands[ally],G.hands[ally].map((_,i)=>i)):[];
+  const allyHasMaster=allyMasters.length>0;
+  const myAllyVoids=allyVoids(p);
+  const _playersLeftNow=ORDER.filter(pl=>!G.trick.some(t=>t.player===pl)&&pl!==p);
+  const lastPlayerInTrick=_playersLeftNow.length>0?_playersLeftNow[_playersLeftNow.length-1]:null;
+  const lastPlayerHasTen=lastPlayerInTrick!==null&&G.hands[lastPlayerInTrick]&&G.hands[lastPlayerInTrick].some(c=>c.rank==='10');
+  const lastPlayerIsAlly2=lastPlayerInTrick===ally;
+
+  // ── Hand shape ──
   const masterCards=getMasters(h,pi);
   const masterNonTrump=masterCards.filter(i=>h[i]&&h[i].suit!==G.trump&&h[i].rank!=='10');
-
-  // ── Long suit ──
   const longSuits=getLongSuits(h,G.trump);
   const longSuitLeads=pi.filter(i=>h[i]&&longSuits.includes(h[i].suit)&&h[i].rank!=='10');
-
-  // ── Trump parity ──
   const teamHasTrumpAdvantage=myTeamTrumpAdvantage(h,isOpp);
-
-  // ── Trump decider danger ──
   const trumpDanger=trumpDeciderSuitDanger(isOpp);
-
-  // ── Hand shape flags ──
   const trumpHeavy=handIsTrumpHeavy(h,G.trump);
   const noTrump=handHasNoTrump(h,G.trump);
   const suitsToVoid=suitToVoidSoon(h,G.trump);
@@ -1861,228 +2197,197 @@ function botPlay(){
   const sacrificeMode=sacrificeRoundWorthIt(isOpp);
   const ruffPromotion=trumpPromotionOpportunity(h,isOpp);
 
-  // ── LEADING the trick ──
+  // ── LEADING ──
   if(G.trick.length===0){
-    // Count cards per suit in hand (excluding trump)
     const suitCounts={};
-    for(const s of ['♠','♥','♦','♣']){
-      if(s===G.trump)continue;
-      suitCounts[s]=h.filter(c=>c.suit===s).length;
-    }
-
-    // Void strategy: find suits where we have exactly 1 card left AND that card is not a 10
-    // We never void using a 10 — 10s are too valuable to lead away
-    // (A suit where the last card IS a 10 is excluded — we hold it until forced or it wins a Dol)
-    const almostVoid=Object.entries(suitCounts)
-      .filter(([s,cnt])=>{
-        if(cnt!==1)return false;
-        const lastCard=h.find(c=>c.suit===s);
-        return lastCard&&lastCard.rank!=='10'; // only void if the last card is not a 10
-      })
-      .map(([s])=>s);
-
-    // Find playable cards in almost-void suits (already guaranteed non-10 by almostVoid filter)
+    for(const s of SUITS){if(s===G.trump)continue;suitCounts[s]=h.filter(c=>c.suit===s).length;}
+    const almostVoid=Object.entries(suitCounts).filter(([s,cnt])=>{
+      if(cnt!==1)return false;
+      const lastCard=h.find(c=>c.suit===s);
+      return lastCard&&lastCard.rank!=='10';
+    }).map(([s])=>s);
     const voidLeads=pi.filter(i=>h[i]&&almostVoid.includes(h[i].suit)&&h[i].rank!=='10');
-
-    // Bots should almost NEVER lead a 10 — only as absolute last resort
     const safeLeads=pi.filter(i=>h[i]&&h[i].rank!=='10'&&h[i].suit!==G.trump);
-    const _trickHasTenLead=false; // no trick yet when leading (local only)
-
-    // Early-game Ace tactic: in the first 4 tricks, lead Aces aggressively.
-    // Early on, players still have full suits — void situations are rare, so
-    // trump counter-plays are less likely. An Ace wins the stack cleanly
-    // and opens the door for teammates to drop a 10 on it safely.
     const earlyGame=G.tricks<=4;
     const aces=safeLeads.filter(i=>h[i]&&h[i].rank==='A');
 
-    // ── Trump-heavy hand: lead trump immediately to control round ──
-    if(trumpHeavy && trumps.length>=5 && G.tricks<=2){
-      // Drain opponents' trump early when we have overwhelming trump power
-      chosen=lowest(h,trumps);
-    }
-    // ── No-trump hand: focus entirely on mastering side suits ──
-    else if(noTrump && masterNonTrump.length>0){
-      chosen=masterNonTrump[0];
-    }
-    // ── Ruff-and-discard avoidance: never lead if both enemies void ──
-    // (filtered into safeLeads logic below via ruffAndDiscardDanger)
+    // Tactic 23: Perfect endgame
+    const perfectPlay=perfectEndgame(p,pi,h,isOpp);
+    if(perfectPlay!==null){chosen=perfectPlay;}
 
-    // ── Conservative mode: 3-0 lead → don't do anything risky ──
-    // Just lead safe low cards — let opponents burn resources
-    else if(conservativeModeOn && safeLeads.length>0){
-      // Lead the safest (lowest non-trump non-10) card — no need to be clever
+    // Tactic 1: Trump echo extraction — lead A then K to clear all trump in 2 rounds
+    else if(hasTrumpEcho(h)&&G.tricks<=3&&!postTensMode&&teamHasTrumpAdvantage){
+      const trumpAce=pi.find(i=>h[i]&&h[i].suit===G.trump&&h[i].rank==='A');
+      const trumpKing=pi.find(i=>h[i]&&h[i].suit===G.trump&&h[i].rank==='K');
+      // First step: lead Ace; if already led Ace last trick, lead King
+      if(trumpEchoSecondStep(h,isOpp)&&trumpKing!==undefined){chosen=trumpKing;}
+      else if(trumpAce!==undefined){chosen=trumpAce;}
+      else{chosen=lowest(h,trumps)||lowest(h,pi);}
+    }
+
+    // Tactic 27: Trump endplay — give enemy lead when they only have trump
+    else if(isTrumpEndplay(isOpp)&&safeLeads.length>0&&!postTensMode){
+      // Lead a suit enemy must ruff, then they lead trump into us
+      chosen=safeLeads.reduce((a,b)=>rv(h[a].rank)>rv(h[b].rank)?b:a);
+    }
+
+    // Tactic 26: Vienna Coup — cash master to unblock in late game
+    else if(G.tricks>=9&&!postTensMode){
+      const vc=viennaCoupCard(h,pi,isOpp);
+      if(vc!==null)chosen=vc;
+      else{chosen=masterNonTrump.length>0?masterNonTrump[0]:safeLeads.length>0?safeLeads[0]:lowest(h,pi);}
+    }
+
+    // Trump-heavy: drain opponents — only when we have 5+ trump AND it's early
+    else if(trumpHeavy&&trumps.length>=5&&G.tricks<=2){
+      // Lead lowest trump to extract — preserve A and K for later control
+      const nonAceKingTrumps=trumps.filter(i=>h[i].rank!=='A'&&h[i].rank!=='K');
+      chosen=nonAceKingTrumps.length>0?lowest(h,nonAceKingTrumps):lowest(h,trumps);
+    }
+
+    // No-trump: master side suits
+    else if(noTrump&&masterNonTrump.length>0){chosen=masterNonTrump[0];}
+
+    // Conservative: protect 3-0 lead
+    else if(conservativeModeOn&&safeLeads.length>0){
       const noRuffSafe=safeLeads.filter(i=>h[i]&&!ruffAndDiscardDanger(h[i].suit,isOpp)&&!nextEnemyVoidIn(h[i].suit,p,isOpp));
       const pool=noRuffSafe.length>0?noRuffSafe:safeLeads;
       chosen=pool.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
     }
-    // ── Post-tens mode: all 10s gone → maximise Inn wins ──
+
+    // No enemy ten threat + post-tens: go for Inns aggressively
+    else if(noEnemyTenThreat&&masterNonTrump.length>0&&postTensMode){
+      chosen=masterNonTrump.reduce((a,b)=>rv(h[b].rank)>rv(h[a].rank)?b:a);
+    }
+
+    // Post-tens: maximize Inns
     else if(postTensMode){
-      // Lead master cards first — guaranteed wins
-      if(masterNonTrump.length>0){
-        chosen=masterNonTrump.reduce((a,b)=>rv(h[b].rank)>rv(h[a].rank)?b:a);
-      } else if(safeLeads.length>0){
-        const sorted=[...safeLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
-        chosen=sorted[0];
-      }
+      // Tactic 24: exact Inn tiebreaker
+      if(masterNonTrump.length>0){chosen=masterNonTrump.reduce((a,b)=>rv(h[b].rank)>rv(h[a].rank)?b:a);}
+      else if(safeLeads.length>0){const s=[...safeLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));chosen=s[0];}
     }
-    // ── Avoid leading into next enemy's known void ──
-    // Filter safeLeads to exclude suits where next enemy is void
-    else if(safeLeads.length>0&&safeLeads.some(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp))){
-      const safestLeads=safeLeads.filter(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp));
-      const sortedSafe=[...safestLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
-      // Use safest leads pool for subsequent lead logic (shadow safeLeads)
-      safeLeads.length=0;sortedSafe.forEach(i=>safeLeads.push(i));
-    }
-    // ── Finesse: lead Q when holding A-Q without K ──
-    // Forces K out of opponents if they have it, then A takes control next trick
-    if(false){ /* finesse applied below in suit-specific lead */ }
 
-    // ── Suit exhaustion: lead exhausted suits to force voids ──
-    // If a suit is nearly gone from the game (10+ seen), leading it forces opponents
-    // to trump or discard. Use this to probe and drain trump reserves mid-game.
-    const exhaustedSuitLeads=safeLeads.filter(i=>{
-      const s=h[i].suit;
-      return suitLikelyExhausted(s) && suitCounts[s]>1; // still have cards to lead
-    });
-
-    // ── Trump squeeze lead ──
-    // Mid-game, if we're ahead, lead trump to drain opponent reserves
-    // so they can't steal future Dols
-    const trumpSqueezeLead=trumpSqueezeWorthIt(h,isOpp)&&trumps.length>0;
-
-    if(earlyGame && aces.length>0){
-      // ── Entry management: save Ace if tens still out and mid-late game ──
-      // An Ace is best used to seize the lead at a critical moment (when a 10 might appear)
-      // In early game (tricks ≤ 2): lead freely. In tricks 3-4: only lead Ace if no tens remain nearby
-      const saveAceForEntry=G.tricks>=2&&tensRemaining>=2&&!desperateModeOn;
-      if(!saveAceForEntry){
-        // Lead the Ace of the deepest suit
-        const aceBySuitDepth=[...aces].sort((a,b)=>{
-          const countA=h.filter(c=>c.suit===h[a].suit).length;
-          const countB=h.filter(c=>c.suit===h[b].suit).length;
-          return countB-countA;
-        });
-        chosen=aceBySuitDepth[0];
-      }
-      // else fall through — save the Ace, pick another lead
-    }
-    // ── Master card leads — unbeatable in suit ──
-    else if(masterNonTrump.length>0&&!postTensMode){
-      // Lead a master card confidently — guaranteed to win the trick
-      // Pick the master in the longest suit to establish that suit
-      const masterBySuit=masterNonTrump.sort((a,b)=>{
-        const cntA=h.filter(c=>c.suit===h[a].suit).length;
-        const cntB=h.filter(c=>c.suit===h[b].suit).length;
-        return cntB-cntA;
-      });
-      chosen=masterBySuit[0];
-    }
-    // ── Long suit establishment ──
-    else if(longSuitLeads.length>0&&G.tricks<=6&&!desperateModeOn){
-      // Lead long suit repeatedly to exhaust opponents and establish masters
-      // Avoid leading into known enemy voids
-      const safeLongLeads=longSuitLeads.filter(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp));
-      if(safeLongLeads.length>0){
-        // Lead lowest of the long suit (preserve high cards for later masters)
-        chosen=safeLongLeads.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
-      }
-    }
-    else if(trumpSqueezeLead&&teamHasTrumpAdvantage){
-      // Trump squeeze: only lead trump if we have the advantage
-      chosen=lowest(h,trumps);
-    }
-    // ── Last trump extraction: lead trump to clear opponents' last trump ──
-    // Once their last trump is pulled, all our masters in side suits are safe
-    else if(oppsTrumpGone&&!postTensMode){
-      // Opponents have no trump left — all our non-trump high cards are now safe
-      if(masterNonTrump.length>0){
-        // Lead master in longest suit for maximum pressure
-        const masterBySuit2=[...masterNonTrump].sort((a,b)=>{
-          const cA=h.filter(c=>c.suit===h[a].suit).length;
-          const cB=h.filter(c=>c.suit===h[b].suit).length;
-          return cB-cA;
-        });
-        chosen=masterBySuit2[0];
-      } else if(safeLeads.length>0){
-        // No masters, but opponents can't trump — lead highest safe card
-        const sorted=[...safeLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
-        chosen=sorted[0];
-      }
-    }
-    // ── Singleton / doubleton void planning ──
-    // Prioritise completing voids in suits with 1-2 cards (not 10s)
-    else if(suitsToVoid.length>0&&!desperateModeOn&&G.tricks<=8){
-      const singletons=pi.filter(i=>h[i]&&suitsToVoid.includes(h[i].suit)&&isSingleton(h,h[i].suit)&&h[i].rank!=='10');
-      const doubletons=pi.filter(i=>h[i]&&suitsToVoid.includes(h[i].suit)&&isDoubleton(h,h[i].suit)&&h[i].rank!=='10');
-      // Prioritise singletons (quickest void)
-      if(singletons.length>0)chosen=singletons.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
-      else if(doubletons.length>0)chosen=doubletons.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
-    }
-    else if(exhaustedSuitLeads.length>0){
-      // Lead exhausted suit to force voids and probe trump holdings
-      const sorted=[...exhaustedSuitLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
-      chosen=sorted[0]; // lead highest exhausted-suit card to maximise pressure
-    }
-    else if(voidLeads.length>0){
-      // Void-completing lead
-      chosen=voidLeads.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
-    }
-    else if(safeLeads.length>0){
-      // ── Filter out ruff-and-discard danger suits ──
-      // Never lead a suit both enemies are void in
-      const noRuffLeads=safeLeads.filter(i=>h[i]&&!ruffAndDiscardDanger(h[i].suit,isOpp));
-      const safeLeadsFiltered=noRuffLeads.length>0?noRuffLeads:safeLeads;
-      // ── Avoid trump-danger suit (decider's team loaded with trump early) ──
-      const nonDangerLeads=trumpDanger
-        ?safeLeadsFiltered.filter(i=>h[i]&&h[i].suit!==G.trump)
-        :safeLeadsFiltered;
-      const pool=nonDangerLeads.length>0?nonDangerLeads:safeLeadsFiltered;
-
-      // ── Finesse opportunity: lead Q when holding A-Q but not K ──
-      const finesseLeads=pool.filter(i=>h[i]&&canFinesse(h,h[i].suit)&&h[i].rank==='Q');
-      if(finesseLeads.length>0){
-        chosen=finesseLeads[0];
-      }
-      // ── Safe exit card: lead a guaranteed safe suit ──
-      else {
-        const safeExit=getSafeExitCard(h,pool,isOpp);
-        if(safeExit!==null&&pool.includes(safeExit)){
-          chosen=safeExit;
+    // Tactic 7: Trump tap — lead ally's void suit to drain enemy trump
+    else if(!postTensMode&&G.tricks<=8){
+      const tapCard=trumpTapSuit(h,pi,isOpp);
+      if(tapCard!==null){chosen=tapCard;}
+      else{
+        // Filter safe leads by next enemy void
+        if(safeLeads.length>0&&safeLeads.some(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp))){
+          const safest=safeLeads.filter(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp));
+          const s=[...safest].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
+          safeLeads.length=0;s.forEach(i=>safeLeads.push(i));
         }
-        // ── Ally void cross-ruff ──
-        else {
-          const crossRuffLeads=pool.filter(i=>h[i]&&myAllyVoids.has(h[i].suit)&&h[i].suit!==G.trump);
-          if(crossRuffLeads.length>0&&G.tricks>=3&&!trumpDanger){
-            chosen=crossRuffLeads.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
-          } else {
-            // Standard: second-highest non-trump non-10
-            const sorted=[...pool].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
-            chosen=sorted.length>1?sorted[1]:sorted[0];
+        chosen=undefined; // fall through to suit-specific logic
+      }
+    }
+
+    if(chosen===null||chosen===lowest(h,pi)){
+      // Filter safe leads
+      if(safeLeads.length>0&&safeLeads.some(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp))){
+        const safest=safeLeads.filter(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp));
+        const s=[...safest].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
+        safeLeads.length=0;s.forEach(i=>safeLeads.push(i));
+      }
+
+      const exhaustedSuitLeads=safeLeads.filter(i=>{const s=h[i].suit;return suitLikelyExhausted(s)&&suitCounts[s]>1;});
+      const trumpSqueezeLead=trumpSqueezeWorthIt(h,isOpp)&&trumps.length>0;
+
+      if(earlyGame&&aces.length>0){
+        const saveAceForEntry=G.tricks>=2&&tensRemaining>=2&&!desperateModeOn;
+        if(!saveAceForEntry){
+          const byDepth=[...aces].sort((a,b)=>h.filter(c=>c.suit===h[b].suit).length-h.filter(c=>c.suit===h[a].suit).length);
+          chosen=byDepth[0];
+        }
+      }
+
+      // Tactic 8: Entry preservation — lead suit with most entries for ally
+      if((chosen===undefined||chosen===lowest(h,pi))&&allyHasMaster&&safeLeads.length>0){
+        // Lead suit where ally has winner waiting — preserve our entry
+        const allyMasterSuits=new Set(allyMasters.map(i=>G.hands[ally][i]?G.hands[ally][i].suit:null).filter(Boolean));
+        const entryLeads=safeLeads.filter(i=>allyMasterSuits.has(h[i].suit));
+        if(entryLeads.length>0)chosen=entryLeads.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+      }
+
+      if((chosen===undefined||chosen===lowest(h,pi))&&masterNonTrump.length>0&&!postTensMode){
+        // Tactic 5: Suit preference — lead master in ally's strong suit
+        const spLead=suitPreferenceLead(h,masterNonTrump,isOpp);
+        if(spLead!==null){chosen=spLead;}
+        else{
+          const safeMasters=allyHasTen?masterNonTrump.filter(i=>!ruffAndDiscardDanger(h[i].suit,isOpp)&&!nextEnemyVoidIn(h[i].suit,p,isOpp)):masterNonTrump;
+          const pool=safeMasters.length>0?safeMasters:masterNonTrump;
+          const byLen=[...pool].sort((a,b)=>h.filter(c=>c.suit===h[b].suit).length-h.filter(c=>c.suit===h[a].suit).length);
+          chosen=byLen[0];
+        }
+      }
+      else if((chosen===undefined||chosen===lowest(h,pi))&&longSuitLeads.length>0&&G.tricks<=6&&!desperateModeOn){
+        const safe=longSuitLeads.filter(i=>!nextEnemyVoidIn(h[i].suit,p,isOpp));
+        if(safe.length>0)chosen=safe.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+      }
+      else if((chosen===undefined||chosen===lowest(h,pi))&&trumpSqueezeLead&&teamHasTrumpAdvantage){
+        chosen=lowest(h,trumps);
+      }
+      else if((chosen===undefined||chosen===lowest(h,pi))&&oppsTrumpGone&&!postTensMode){
+        if(masterNonTrump.length>0){
+          const byLen=[...masterNonTrump].sort((a,b)=>h.filter(c=>c.suit===h[b].suit).length-h.filter(c=>c.suit===h[a].suit).length);
+          chosen=byLen[0];
+        } else if(safeLeads.length>0){
+          const s=[...safeLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));chosen=s[0];
+        }
+      }
+      else if((chosen===undefined||chosen===lowest(h,pi))&&suitsToVoid.length>0&&!desperateModeOn&&G.tricks<=8){
+        const sings=pi.filter(i=>h[i]&&suitsToVoid.includes(h[i].suit)&&isSingleton(h,h[i].suit)&&h[i].rank!=='10');
+        const doubs=pi.filter(i=>h[i]&&suitsToVoid.includes(h[i].suit)&&isDoubleton(h,h[i].suit)&&h[i].rank!=='10');
+        if(sings.length>0)chosen=sings.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+        else if(doubs.length>0)chosen=doubs.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+      }
+      else if((chosen===undefined||chosen===lowest(h,pi))&&exhaustedSuitLeads.length>0){
+        const s=[...exhaustedSuitLeads].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));chosen=s[0];
+      }
+      else if((chosen===undefined||chosen===lowest(h,pi))&&voidLeads.length>0){
+        chosen=voidLeads.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+      }
+      else if((chosen===undefined||chosen===lowest(h,pi))&&safeLeads.length>0){
+        const noRuff=safeLeads.filter(i=>h[i]&&!ruffAndDiscardDanger(h[i].suit,isOpp));
+        const filt=noRuff.length>0?noRuff:safeLeads;
+        const nonDanger=trumpDanger?filt.filter(i=>h[i]&&h[i].suit!==G.trump):filt;
+        const pool=nonDanger.length>0?nonDanger:filt;
+        // Tactic 5: suit preference signal
+        const spLead=suitPreferenceLead(h,pool,isOpp);
+        if(spLead!==null){chosen=spLead;}
+        else{
+          const finesseLeads=pool.filter(i=>h[i]&&canFinesse(h,h[i].suit)&&h[i].rank==='Q');
+          if(finesseLeads.length>0){chosen=finesseLeads[0];}
+          else{
+            const safeExit=getSafeExitCard(h,pool,isOpp);
+            if(safeExit!==null&&pool.includes(safeExit)){chosen=safeExit;}
+            else{
+              const crossRuff=pool.filter(i=>h[i]&&myAllyVoids.has(h[i].suit)&&h[i].suit!==G.trump);
+              if(crossRuff.length>0&&G.tricks>=3&&!trumpDanger){
+                chosen=crossRuff.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
+              } else {
+                // Tactic 4: Discovery lead — lead low in unknown suit to probe
+                const discovery=pool.filter(i=>h[i]&&!opponentSignaledStrengthIn(0,h[i].suit)&&!opponentSignaledStrengthIn(2,h[i].suit));
+                const s=[...(discovery.length?discovery:pool)].sort((a,b)=>rv(h[b].rank)-rv(h[a].rank));
+                chosen=s.length>1?s[1]:s[0];
+              }
+            }
           }
         }
       }
-    }
-    else if(trumps.length>0){
-      // ── 4-3 trump split: if team holds 7 trump, leading 3 rounds clears all ──
-      const myTrumpCount=h.filter(c=>c.suit===G.trump).length;
-      const allyTrumpEst=Math.round(trumpsUnseen(h)*0.4); // rough estimate
-      const teamTrumpEst=myTrumpCount+allyTrumpEst;
-      if(teamTrumpEst>=6&&myTrumpCount>=3){
-        // We likely have trump majority — lead lowest to extract efficiently
-        chosen=lowest(h,trumps);
-      } else {
+      else if((chosen===undefined||chosen===lowest(h,pi))&&trumps.length>0){
         chosen=lowest(h,trumps);
       }
-    }
-    else if(desperateModeOn && tens.length>0){
-      chosen=tens[0];
-    }
-    else {
-      chosen=lowestNonTen(h,pi);
+      else if((chosen===undefined||chosen===lowest(h,pi))&&desperateModeOn&&tens.length>0){
+        chosen=tens[0];
+      }
+      else if(chosen===undefined||chosen===lowest(h,pi)){
+        chosen=lowestNonTen(h,pi)||lowest(h,pi)||pi[0];
+      }
     }
   }
 
-  // ── FOLLOWING the trick ──
+  // ── FOLLOWING ──
   else {
     const tm=Object.fromEntries(G.trick.map(t=>[t.player,t]));
     const wi=trickWinner(tm,G.leadSuit);
@@ -2091,111 +2396,79 @@ function botPlay(){
     const trickHasTen=stackHasTen();
     const playersLeft=ORDER.filter(pl=>!G.trick.some(t=>t.player===pl)&&pl!==p);
     const isLastToPlay=playersLeft.length===0;
+    const enemiesLeft=playersLeft.filter(pl=>isOpp?(pl===0||pl===1):(pl===2||pl===3));
+    const alliesLeft=playersLeft.filter(pl=>isOpp?(pl===2||pl===3):(pl===0||pl===1));
 
     // ── Comprehensive 10 Risk Analysis ──
-    // Returns: 'safe' | 'risky' | 'unsafe'
     function tenRisk(tenCard){
-      const enemiesLeft=playersLeft.filter(pl=>
-        isOpp?(pl===0||pl===1):(pl===2||pl===3)
-      );
-      const alliesLeft=playersLeft.filter(pl=>
-        isOpp?(pl===2||pl===3):(pl===0||pl===1)
-      );
-      const winEntry=G.trick.length>0?G.trick[trickWinner(
-        Object.fromEntries(G.trick.map(t=>[t.player,t])),G.leadSuit
-      )]:null;
+      const winEntry=G.trick.length>0?G.trick[trickWinner(Object.fromEntries(G.trick.map(t=>[t.player,t])),G.leadSuit)]:null;
       const currentWinCard=winEntry?winEntry.card:null;
       const currentWinIsTrump=currentWinCard&&currentWinCard.suit===G.trump;
       const currentWinRank=currentWinCard?rv(currentWinCard.rank):0;
-
-      // ── Risk 1: Not winning and can't win → never waste a 10 ──
-      if(!myTeamWinning && !canBeat(tenCard,G.leadSuit)) return'unsafe';
-
-      // ── Risk 2: Last to play → guaranteed ──
-      if(isLastToPlay) return canBeat(tenCard,G.leadSuit)?'safe':'unsafe';
-
-      // ── Risk 3: No enemies left to play ──
-      if(enemiesLeft.length===0) return'safe';
-
-      // ── Risk 4: Winning card is trump Ace → literally unbeatable ──
-      if(currentWinIsTrump && currentWinRank===14) return'safe';
-
-      // ── Risk 5: Winning card is trump but not Ace ──
-      // Only higher trump can beat it — check if any enemy is known to still have trump
-      if(currentWinIsTrump && currentWinRank<14){
-        const trumpPlayed=G.playedCards.filter(c=>c.suit===G.trump).length;
-        const trumpInTrick=G.trick.filter(t=>t.card.suit===G.trump).length;
-        const trumpInHand=h.filter(c=>c.suit===G.trump).length;
-        const higherTrumpPossible=13-trumpPlayed-trumpInTrick-trumpInHand>0&&
-          G.playedCards.filter(c=>c.suit===G.trump&&rv(c.rank)>currentWinRank).length===0&&
-          !h.some(c=>c.suit===G.trump&&rv(c.rank)>currentWinRank);
-        return higherTrumpPossible?'risky':'safe';
+      if(!myTeamWinning&&!canBeat(tenCard,G.leadSuit))return'unsafe';
+      if(isLastToPlay)return canBeat(tenCard,G.leadSuit)?'safe':'unsafe';
+      if(enemiesLeft.length===0)return'safe';
+      if(currentWinIsTrump&&currentWinRank===14)return'safe';
+      if(currentWinIsTrump&&currentWinRank<14){
+        const enemyHasHigherTrump=enemiesLeft.some(e=>G.hands[e]&&G.hands[e].some(c=>c.suit===G.trump&&rv(c.rank)>currentWinRank));
+        return enemyHasHigherTrump?'risky':'safe';
       }
-
-      // ── Risk 6: Winning card is a non-trump Ace → only trump can beat it ──
-      // Safe if no enemy is KNOWN to be void in the lead suit
-      // (if they must follow suit, they can't trump)
-      if(!currentWinIsTrump && currentWinRank===14){
-        const anyEnemyKnownVoid=enemiesLeft.some(e=>isKnownVoid(e,G.leadSuit));
-        if(!anyEnemyKnownVoid){
-          // Enemies must follow suit — they can't trump. Safe to piggyback.
-          return'safe';
-        }
-        // A known-void enemy can trump — risky
+      if(!currentWinIsTrump&&currentWinRank===14){
+        const anyEnemyActuallyVoid=enemiesLeft.some(e=>G.hands[e]&&!G.hands[e].some(c=>c.suit===G.leadSuit));
+        if(!anyEnemyActuallyVoid)return'safe';
+        const voidEnemyHasTrump=enemiesLeft.some(e=>G.hands[e]&&!G.hands[e].some(c=>c.suit===G.leadSuit)&&G.hands[e].some(c=>c.suit===G.trump));
+        return voidEnemyHasTrump?'risky':'safe';
+      }
+      if(!currentWinIsTrump&&currentWinRank===13){
+        const enemyHasAce=enemiesLeft.some(e=>G.hands[e]&&G.hands[e].some(c=>c.suit===G.leadSuit&&c.rank==='A'));
+        const voidEnemyHasTrump=enemiesLeft.some(e=>G.hands[e]&&!G.hands[e].some(c=>c.suit===G.leadSuit)&&G.hands[e].some(c=>c.suit===G.trump));
+        if(!enemyHasAce&&!voidEnemyHasTrump)return'safe';
+        if(enemyHasAce||voidEnemyHasTrump)return'unsafe';
         return'risky';
       }
-
-      // ── Risk 7: Winning card is a non-trump King (rank 13) ──
-      // Only an Ace in suit or trump can beat it
-      // Safe if: no enemy known void AND Ace of lead suit is already played
-      if(!currentWinIsTrump && currentWinRank===13){
-        const anyEnemyKnownVoid=enemiesLeft.some(e=>isKnownVoid(e,G.leadSuit));
-        const aceOfSuitPlayed=G.playedCards.some(c=>c.suit===G.leadSuit&&c.rank==='A')||
-          G.trick.some(t=>t.card.suit===G.leadSuit&&t.card.rank==='A');
-        const iHaveAce=h.some(c=>c.suit===G.leadSuit&&c.rank==='A');
-        if(!anyEnemyKnownVoid && (aceOfSuitPlayed||iHaveAce)) return'safe';
-        if(!anyEnemyKnownVoid) return'risky'; // Ace might still be out there
-        return'unsafe'; // known void enemy = trump threat
-      }
-
-      // ── Risk 8: Winning card is lower face card (J/Q) or below ──
-      // Higher cards in suit AND trump are both threats → unsafe
-      if(!currentWinIsTrump && currentWinRank<13) return'unsafe';
-
-      return'unsafe'; // default conservative
+      if(!currentWinIsTrump&&currentWinRank<13)return'unsafe';
+      return'unsafe';
     }
 
-    // ── Priority rule 1: Piggyback a 10 on a winning teammate ──
-    // Only if it is SAFE — i.e. certain our team will keep the stack
-    if(myTeamWinning && tens.length>0){
+    // Tactic 23: Perfect endgame (last 2 tricks)
+    if(G.tricks>=11){
+      const perfectPlay=perfectEndgame(p,pi,h,isOpp);
+      if(perfectPlay!==null){if(perfectPlay!=null&&pi.includes(perfectPlay)){play(p,perfectPlay);return;}}
+    }
+
+    // Priority 1: Piggyback 10 on winning teammate
+    if(myTeamWinning&&tens.length>0){
       const trumpTen=tens.filter(i=>h[i].suit===G.trump);
-      // Prefer non-trump tens (save trump-10 for a guaranteed solo win)
       const bestTen=trumpTen.length>0&&tens.length===1?trumpTen[0]:(tens.filter(i=>h[i].suit!==G.trump)[0]||tens[0]);
       const risk=tenRisk(h[bestTen]);
-      if(risk==='safe'){
-        chosen=bestTen;
-        play(p,chosen);return;
-      }
-      // Risky but all enemies already played — they can't steal it
-      if(risk==='risky'&&enemiesLeft.length===0){
-        chosen=bestTen;
-        play(p,chosen);return;
-      }
-      // Risky and ALL remaining enemies are known void in lead suit → they must trump
-      // Only safe if we're already winning with trump
+      if(risk==='safe'){if(bestTen!=null&&pi.includes(bestTen)){play(p,bestTen);return;}}
+      // No enemies left — guaranteed safe
+      if(risk==='risky'&&enemiesLeft.length===0){if(bestTen!=null&&pi.includes(bestTen)){play(p,bestTen);return;}}
       const tm0=Object.fromEntries(G.trick.map(t=>[t.player,t]));
       const wi0=trickWinner(tm0,G.leadSuit);
       const winCard0=G.trick[wi0].card;
-      if(risk==='risky'&&winCard0.suit===G.trump&&enemiesLeft.every(e=>isKnownVoid(e,G.leadSuit))){
-        chosen=bestTen;
-        play(p,chosen);return;
+      // Winning with trump Ace + all enemies void in lead = safe
+      if(risk==='risky'&&winCard0.suit===G.trump&&enemiesLeft.every(e=>isKnownVoid(e,G.leadSuit))){if(bestTen!=null&&pi.includes(bestTen)){play(p,bestTen);return;}}
+      // Winning with a non-trump Ace — piggyback unless enemy is KNOWN void AND KNOWN to have trump
+      // An Ace lead is near-guaranteed, especially early. Don't miss free Dols being overcautious.
+      const winnerIsAce=winCard0&&rv(winCard0.rank)===14&&winCard0.suit!==G.trump;
+      const enemyDefinitelyCanSteal=enemiesLeft.some(e=>
+        G.hands[e]&&!G.hands[e].some(c=>c.suit===G.leadSuit)&&
+        G.hands[e].some(c=>c.suit===G.trump)
+      );
+      if(winnerIsAce&&!enemyDefinitelyCanSteal&&risk!=='unsafe'){
+        if(bestTen!=null&&pi.includes(bestTen)){play(p,bestTen);return;}
       }
-      // Risky — hold the 10, fall through to conservative play
+      // Early game Ace (tricks ≤ 3): even if enemy COULD steal with trump,
+      // burning trump on trick 1-3 is very costly for them. Piggyback anyway.
+      if(winnerIsAce&&G.tricks<=3&&enemyDefinitelyCanSteal){
+        // Enemy burning a trump on an Ace in trick 1-3 is almost always a net loss for them
+        if(bestTen!=null&&pi.includes(bestTen)){play(p,bestTen);return;}
+      }
     }
 
-    // ── Priority rule 2: Play a winning 10 only when last to play ──
-    // Last to play = zero uncertainty, guaranteed win
-    if(tens.length>0 && isLastToPlay){
+    // Priority 2: Winning 10 as last player
+    if(tens.length>0&&isLastToPlay){
       const winningTens=tens.filter(i=>canBeat(h[i],G.leadSuit));
       if(winningTens.length>0){
         const trumpWinTen=winningTens.filter(i=>h[i].suit===G.trump);
@@ -2204,370 +2477,259 @@ function botPlay(){
       }
     }
 
-    // ── Void-suit trump opportunity ──
-    // Bot is void in the lead suit and can freely play trump.
     const currentTM=Object.fromEntries(G.trick.map(t=>[t.player,t]));
     const currentWI=trickWinner(currentTM,G.leadSuit);
     const currentLeadCard=G.trick[currentWI].card;
     const currentLeadRank=rv(currentLeadCard.rank);
-    // A high lead card (J/Q/K/A = rank ≥ 11) is a magnet for opponent 10s:
-    // remaining players may pile a 10 on top since they can't beat the high card anyway,
-    // handing themselves a free Dol. By trumping in now, we:
-    //  (a) prevent opponent 10s from claiming a Dol on a high-card stack, OR
-    //  (b) potentially allow our teammate (still to play) to add their 10 to OUR winning stack
-    const highCardMagnet=currentLeadRank>=11 && !isLastToPlay;
-
-    // ── Pre-compute: is the last remaining player an enemy who might piggyback? ──
+    const highCardMagnet=currentLeadRank>=11&&!isLastToPlay;
     const lastPlayer=playersLeft.length>0?playersLeft[playersLeft.length-1]:null;
     const lastPlayerIsEnemy=lastPlayer!==null&&(isOpp?(lastPlayer===0||lastPlayer===1):(lastPlayer===2||lastPlayer===3));
-    // A low current winner (≤9, non-trump) is a free piggyback invitation for the last player
     const lowWinnerPiggybackRisk=currentLeadRank<=9&&!trickHasTen&&lastPlayerIsEnemy&&!isLastToPlay;
+    const lastToPlayIsAlly=playersLeft.length===1&&(isOpp?(playersLeft[0]===2||playersLeft[0]===3):(playersLeft[0]===0||playersLeft[0]===1));
 
-    if(voidInLeadSuit && trumps.length>0){
-      if(trickHasTen && !myTeamWinning){
-        // Dol already in stack, opponents winning — trump in with lowest trump to take it
-        chosen=lowest(h,trumps);
-        play(p,chosen);return;
-      }
-      if(!trickHasTen && (highCardMagnet||lowWinnerPiggybackRisk) && !myTeamWinning){
-        // High card OR low card with enemy last to play — both invite a 10 piggyback.
-        // Trump in now to deny the free Dol. The enemy's 10 can't beat our trump.
-        chosen=lowest(h,trumps);
-        play(p,chosen);return;
-      }
-      if(trickHasTen && myTeamWinning){
-        // Team winning a Dol — check if an enemy later can over-trump us
-        // If current winner is non-trump and any enemy is void, they could trump
+    // Tactic 10: Uppercut — void in lead, use mid-trump to force over-ruff
+    if(voidInLeadSuit){
+      const uc=canUppercut(h,pi,isOpp);
+      if(uc!==null&&!myTeamWinning){chosen=uc;if(chosen!=null&&pi.includes(chosen)){play(p,chosen);return;}}
+    }
+
+    // Void-suit trump opportunities
+    if(voidInLeadSuit&&trumps.length>0){
+      if(trickHasTen&&!myTeamWinning){chosen=lowest(h,trumps);if(chosen!=null&&pi.includes(chosen)){play(p,chosen);return;}}
+      if(!trickHasTen&&(highCardMagnet||lowWinnerPiggybackRisk)&&!myTeamWinning){chosen=lowest(h,trumps);if(chosen!=null&&pi.includes(chosen)){play(p,chosen);return;}}
+      if(trickHasTen&&myTeamWinning){
         const currentWinnerCard=G.trick[trickWinner(Object.fromEntries(G.trick.map(t=>[t.player,t])),G.leadSuit)].card;
         const enemiesCanOverTrump=!currentWinnerCard||(currentWinnerCard.suit!==G.trump&&
           playersLeft.some(pl=>(isOpp?(pl===0||pl===1):(pl===2||pl===3))&&isKnownVoid(pl,G.leadSuit)));
-        if(enemiesCanOverTrump&&trumps.length>0){
-          // Protect the Dol — trump in to prevent over-trump steal
-          chosen=lowest(h,trumps);
-          play(p,chosen);return;
-        }
+        if(enemiesCanOverTrump){chosen=lowest(h,trumps);if(chosen!=null&&pi.includes(chosen)){play(p,chosen);return;}}
       }
-      // No 10 at stake, no high-card threat, team winning — fall through, save trump
     }
 
-    // Useful card categories for tactics
-    const facePi=pi.filter(i=>h[i]&&rv(h[i].rank)>=11); // J,Q,K,A
+    const facePi=pi.filter(i=>h[i]&&rv(h[i].rank)>=11);
     const nonTrumpFace=facePi.filter(i=>h[i].suit!==G.trump);
-
-    // Current best rank in the trick
     const tm2=Object.fromEntries(G.trick.map(t=>[t.player,t]));
     const wi2=trickWinner(tm2,G.leadSuit);
     const currentBestRank=rv(G.trick[wi2].card.rank);
-    const dolVulnerable=trickHasTen && currentBestRank<=9 && !isLastToPlay;
-
-    // ── Second hand low / Third hand high ──
-    // Position 1 (second to play): play conservatively, let trick develop
-    // Position 2 (third to play): play high if team isn't winning
-    const trickPos=myPosition(p); // 0=first,1=second,2=third,3=last
-    const secondHandLow=trickPos===1 && !trickHasTen && !myTeamWinning;
-    const thirdHandHigh=trickPos===2 && !myTeamWinning && !trickHasTen;
-
-    // ── Partner signal reading ──
+    const dolVulnerable=trickHasTen&&currentBestRank<=9&&!isLastToPlay;
+    const trickPos=myPosition(p);
+    const secondHandLow=trickPos===1&&!trickHasTen&&!myTeamWinning;
+    const thirdHandHigh=trickPos===2&&!myTeamWinning&&!trickHasTen;
     const partnerHighLead=partnerLeadingHigh();
     const partnerLowLead=partnerLeadingLow();
-
-    // ── Duck play assessment ──
     const safeLead2=h.filter(c=>c.suit!==G.trump&&c.rank!=='10').length;
-    const dangerousToLead=safeLead2<=2 && !trickHasTen;
-    const duckWorthIt=dangerousToLead && !myTeamWinning && !trickHasTen && !isLastToPlay;
-
-    // ── Score proximity awareness ──
-    // If opponents are 1-2 pts from winning, treat every Inn as critical
-    const criticalScore=scorePressure.critical && !trickHasTen;
-    // If we're sacrificing the round (comfortably ahead), play minimal effort
-    const goingQuiet=sacrificeMode && !trickHasTen && !facingSweep;
-
-    // ── Throw-in play ──
-    // Deliberately give lead to an enemy with no good cards
-    // Done by playing just above their current winner so they're forced to lead back
-    // Throw-in: can also work second-to-last if the last player is our ally
-    const lastToPlayIsAlly=playersLeft.length===1&&(isOpp?(playersLeft[0]===2||playersLeft[0]===3):(playersLeft[0]===0||playersLeft[0]===1));
-    const throwInAvailable=throwIn!==null && !trickHasTen && (isLastToPlay||lastToPlayIsAlly);
-
-    // ── Trump promotion ──
-    // Void in lead suit: if we have mid-trumps, consider over-ruffing to promote them
-    const promotionRuff=voidInLeadSuit && ruffPromotion && trumps.length>0 && !myTeamWinning;
-
-    // ── Attitude signal: has enemy signaled weakness in lead suit? ──
+    const duckWorthIt=safeLead2<=2&&!myTeamWinning&&!trickHasTen&&!isLastToPlay;
+    const criticalScore=scorePressure.critical&&!trickHasTen;
+    const goingQuiet=sacrificeMode&&!trickHasTen&&!facingSweep;
+    const throwInAvailable=throwIn!==null&&!trickHasTen&&(isLastToPlay||lastToPlayIsAlly);
+    const promotionRuff=voidInLeadSuit&&ruffPromotion&&trumps.length>0&&!myTeamWinning;
     const enemyTeam=isOpp?[0,1]:[2,3];
     const enemySignaledWeak=G.leadSuit&&enemyTeam.some(pl=>opponentSignaledWeaknessIn(pl,G.leadSuit));
-    // If enemy signaled weakness in this suit, it's safer to win it
     const suitSafeToWin=enemySignaledWeak&&!trickHasTen;
-
-    // ── Sacrifice Inn for trump preservation ──
-    // If winning this Inn requires our last trump, let it go
     const myTrumpsLeft=h.filter(c=>c.suit===G.trump).length;
-    const lastTrumpSacrifice=!trickHasTen && myTrumpsLeft<=1 && !isLastToPlay && tensRemaining>0;
+    const lastTrumpSacrifice=!trickHasTen&&myTrumpsLeft<=1&&!isLastToPlay&&tensRemaining>0;
 
-    // ── Covering honours ──
-    // If opponent led a face card (J/Q/K), cover it with our higher face card
-    // to force out their top cards early
+    // Tactic 15: Protected ten — lead protecting card first
+    if(G.leadSuit&&!voidInLeadSuit){
+      const protected10=hasProtectedTen(h,pi,G.leadSuit);
+      if(protected10!==null&&!myTeamWinning&&!trickHasTen){
+        chosen=protected10;// don't early-return — let safety nets apply
+      }
+    }
+
+    // Tactic 9: Hold-up play — duck enemy's master to exhaust entries
+    if(shouldHoldUp(h,pi,isOpp)&&!trickHasTen&&!desperateModeOn&&!criticalScore){
+      const lower=pi.filter(i=>h[i]&&h[i].suit===G.leadSuit&&!canBeat(h[i],G.leadSuit)&&h[i].rank!=='10');
+      if(lower.length>0){chosen=lowest(h,lower);if(chosen!=null&&pi.includes(chosen)){play(p,chosen);return;}}
+    }
+
+    // Covering honours
     if(!myTeamWinning&&G.trick.length>0){
       const ledCard=G.trick[0].card;
       const enemies2=isOpp?[0,1]:[2,3];
       const ledByEnemy=enemies2.includes(G.trick[0].player);
       if(ledByEnemy&&rv(ledCard.rank)>=11&&rv(ledCard.rank)<=13){
         const cover=shouldCoverHonour(h,pi,G.leadSuit);
-        if(cover!==null&&pi.includes(cover)&&h[cover]&&h[cover].rank!=='10'){
-          chosen=cover;
-          // Don't early-return — let safety nets apply
-        }
+        if(cover!==null&&pi.includes(cover)&&h[cover]&&h[cover].rank!=='10'){chosen=cover;}
       }
     }
 
-    // ── Dol Protection tactic ──
-    // If there's a 10 in the stack and the current winning card is low enough
-    // that an opponent's 10 could steal it, raise the bar with a face card
-    // so only something higher than J can win — protecting our Dol
-    if(trickHasTen && !myTeamWinning && !isLastToPlay){
-      // Opponents are winning a Dol stack — fight with cheapest winning card
+    // Dol Protection
+    if(trickHasTen&&!myTeamWinning&&!isLastToPlay){
       const cheap=cheapestWin(h,pi,G.leadSuit);
       if(cheap!==null){
-        // Prefer a non-trump winning card to conserve trump
-        const cheapNonTrump=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
-        chosen=cheapNonTrump!==null?cheapNonTrump:cheap;
-        // Don't use a 10 to win a 10 if we have another option
-        if(h[chosen]&&h[chosen].rank==='10'){
-          const nonTenWin=cheapestWin(h,nonTens,G.leadSuit);
-          if(nonTenWin!==null)chosen=nonTenWin;
-        }
-      } else {
-        chosen=lowestNonTen(h,pi);
-      }
+        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+        chosen=cheapNT!==null?cheapNT:cheap;
+        if(h[chosen]&&h[chosen].rank==='10'){const ntw=cheapestWin(h,nonTens,G.leadSuit);if(ntw!==null)chosen=ntw;}
+      } else {chosen=lowestNonTen(h,pi);}
     }
 
-    // ── Dol vulnerability tactic ──
-    // Stack has a 10, current winner is low (rank ≤ 9) and we're not last.
-    // An opponent could steal with their own 10. Raise the winning bar.
-    else if(dolVulnerable && myTeamWinning){
-      if(nonTrumpFace.length>0){
-        // Use cheapest non-trump face card
-        const cheapFace=nonTrumpFace.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
-        chosen=cheapFace;
-      } else {
-        // No face card — at least play a 9 if available (beats 8 or lower current winner)
-        const nines=pi.filter(i=>h[i]&&h[i].rank==='9'&&h[i].suit!==G.trump&&h[i].rank!=='10');
-        if(nines.length>0)chosen=nines[0];
-        // else fall through — no good option
-      }
+    // Dol vulnerability
+    else if(dolVulnerable&&myTeamWinning){
+      if(nonTrumpFace.length>0){chosen=nonTrumpFace.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);}
+      else{const nines=pi.filter(i=>h[i]&&h[i].rank==='9'&&h[i].suit!==G.trump);if(nines.length>0)chosen=nines[0];}
     }
 
-    // ── Scenario A: My team is already winning ──
+    // Tactic 32: Force ally to lead — deliberately lose to give ally the lead
+    else if(shouldForceAllyLead(h,pi,isOpp)&&!myTeamWinning&&!trickHasTen&&!isLastToPlay&&trickPos<=1){
+      const dump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);
+      if(dump!==undefined){chosen=dump;} // fall through to safety nets
+    }
+
+    // Scenario A: My team winning
     else if(myTeamWinning){
-      if(isLastToPlay){
-        // Last to play, team winning — dump lowest non-10 to preserve good cards
-        chosen=lowestNonTen(h,pi);
+      // Tactic 11: Avoidance — choose win card to put safe player on lead
+      if(!isLastToPlay&&!trickHasTen){
+        const avoidCard=avoidanceLead(h,pi,isOpp);
+        if(avoidCard!==null){chosen=avoidCard;}
+        else{
+          if(isLastToPlay)chosen=lowestNonTen(h,pi);
+          else if(trickHasTen)chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:nonTens.length>0?nonTens:pi);
+          else{
+            const sd=nonTrumpNonTen.length>0?lowestNonTen(h,nonTrumpNonTen):lowestNonTen(h,pi.filter(i=>h[i]&&h[i].rank!=='10'&&h[i].suit!==G.trump));
+            chosen=sd!==undefined?sd:lowest(h,pi.filter(i=>h[i]&&h[i].rank!=='10'))||lowest(h,pi);
+          }
+        }
       } else {
-        if(trickHasTen){
-          // Stack has a 10 — dump lowest non-trump non-10 to stay safe
-          chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:nonTens.length>0?nonTens:pi);
-        } else {
-          // No 10 at stake — dump lowest non-trump non-10 (conserve trump AND 10)
-          const safeDump=nonTrumpNonTen.length>0
-            ?lowestNonTen(h,nonTrumpNonTen)
-            :lowestNonTen(h,pi.filter(i=>h[i]&&h[i].rank!=='10'&&h[i].suit!==G.trump));
-          // Never dump a 10 when team is already winning
-          chosen=safeDump!==undefined?safeDump:lowest(h,pi.filter(i=>h[i]&&h[i].rank!=='10'))||lowest(h,pi);
+        if(isLastToPlay)chosen=lowestNonTen(h,pi);
+        else if(trickHasTen)chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:nonTens.length>0?nonTens:pi);
+        else{
+          const sd=nonTrumpNonTen.length>0?lowestNonTen(h,nonTrumpNonTen):lowestNonTen(h,pi.filter(i=>h[i]&&h[i].rank!=='10'&&h[i].suit!==G.trump));
+          chosen=sd!==undefined?sd:lowest(h,pi.filter(i=>h[i]&&h[i].rank!=='10'))||lowest(h,pi);
         }
       }
     }
 
-    // ── Scenario B: Opponents are winning, no 10 in stack ──
+    // Scenario B: Opponents winning
     else {
       const cheap=cheapestWin(h,pi,G.leadSuit);
 
       // ── Anti-piggyback raise ──
-      // Last player is an enemy (ally of opponent team), current winner is low (≤9),
-      // no 10 yet — enemy will almost certainly piggyback a 10 as last player.
-      // If we can WIN the trick with a face card, do it now so enemy's 10 can't win.
-      // If we can't win but have a face card that raises the bar above 10 (J/Q/K),
-      // play it — even if we lose, the enemy's 10 won't win either (J > 10).
-      if(lowWinnerPiggybackRisk && !goingQuiet && !sacrificeMode){
-        if(cheap!==null){
-          // We CAN win — take the trick to deny the piggyback entirely
-          const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
-          chosen=cheapNT!==null?cheapNT:cheap;
-          play(p,chosen);return;
-        } else {
-          // We can't win — but if we have a face card (J/Q/K) in the lead suit,
-          // play it to raise the bar above 10. Enemy's 10 will still lose to our face card.
-          const faceInSuit=pi.filter(i=>h[i]&&h[i].suit===G.leadSuit&&rv(h[i].rank)>=11&&h[i].rank!=='10');
-          if(faceInSuit.length>0){
-            // Play cheapest face card that beats the current winner
-            const beats=faceInSuit.filter(i=>canBeat(h[i],G.leadSuit));
-            if(beats.length>0){
-              chosen=beats.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b);
-              play(p,chosen);return;
-            }
-          }
+      // Current winner is low (≤9) and an enemy plays LAST — they will piggyback a 10.
+      // To block: we need to raise the bar to rank ≥ 11 (J/Q/K/A) so their 10 can't win.
+      // Playing an 8 over a 7 does NOT help — 10 still beats 8.
+      if(lowWinnerPiggybackRisk&&!goingQuiet&&!sacrificeMode){
+        // Find cards that raise the bar above 10 (rank ≥ 11, non-ten, beats current winner)
+        const barRaisers=pi.filter(i=>h[i]&&h[i].rank!=='10'&&rv(h[i].rank)>=11&&canBeat(h[i],G.leadSuit));
+        // Among bar-raisers, prefer non-trump (save trump for emergencies)
+        const barRaiserNT=barRaisers.filter(i=>h[i].suit!==G.trump);
+        const bestRaiser=barRaiserNT.length>0
+          ?barRaiserNT.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b)  // cheapest non-trump raiser
+          :barRaisers.length>0
+            ?barRaisers.reduce((a,b)=>rv(h[a].rank)<rv(h[b].rank)?a:b) // cheapest trump raiser
+            :null;
+        if(bestRaiser!==null){
+          chosen=bestRaiser;if(chosen!=null&&pi.includes(chosen)){play(p,chosen);return;}
         }
+        // Can't raise bar above 10 — if void in lead suit, trump in with lowest trump
+        if(voidInLeadSuit&&trumps.length>0){
+          chosen=lowest(h,trumps);if(chosen!=null&&pi.includes(chosen)){play(p,chosen);return;}
+        }
+        // Fallback: if we literally cannot block (e.g. only have 2s and 3s in suit),
+        // dump lowest non-10 — at least don't give away a 10
       }
 
-      // Going quiet (sacrifice round) → play lowest, conserve resources
-      if(goingQuiet){
-        chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi);
+      // Tactic 16: Forcing play — win expensively to put enemy in bad lead position
+      if(cheap!==null&&!trickHasTen&&isLastToPlay){
+        // If winning forces a dangerous player to lead next, do it
+        if(isTrumpEndplay(isOpp)){chosen=cheap;}
       }
-      // Critical score → fight for every Inn aggressively
-      else if(criticalScore && cheap!==null){
-        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
-        chosen=cheapNT!==null?cheapNT:cheap;
+
+      if(goingQuiet){chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi);}
+      else if(criticalScore&&cheap!==null){const cNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);chosen=cNT!==null?cNT:cheap;}
+      else if(suitSafeToWin&&cheap!==null){const cNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);chosen=cNT!==null?cNT:cheap;}
+      else if(promotionRuff&&trumps.length>0){const pt=cheapestWin(h,trumps,G.leadSuit);if(pt!==null)chosen=pt;}
+      else if(partnerHighLead&&G.trick.length>0){chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi);}
+      else if(partnerLowLead&&!trickHasTen&&cheap!==null){
+        const cNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump&&rv(h[i].rank)<=9),G.leadSuit);
+        if(cNT!==null)chosen=cNT;
+        else{const d=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);chosen=d!==undefined?d:lowest(h,pi);}
       }
-      // Suit safe to win (enemy signaled weakness) → take it cheaply
-      else if(suitSafeToWin && cheap!==null){
-        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
-        chosen=cheapNT!==null?cheapNT:cheap;
-      }
-      // Trump promotion: over-ruff with mid-trump to promote
-      else if(promotionRuff && trumps.length>0){
-        // Use cheapest trump that beats current winner to promote mid-trumps
-        const promTrump=cheapestWin(h,trumps,G.leadSuit);
-        if(promTrump!==null)chosen=promTrump;
-      }
-      // Partner leading high → play low, let partner win cleanly
-      else if(partnerHighLead && G.trick.length>0){
-        chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi);
-      }
-      // Partner leading LOW → they're weak in this suit, don't over-commit
-      // If we can't win cheaply, play low and wait for a better opportunity
-      else if(partnerLowLead && !trickHasTen && cheap!==null){
-        // Only take trick cheaply — don't burn a high card
-        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump&&rv(h[i].rank)<=9),G.leadSuit);
-        if(cheapNT!==null)chosen=cheapNT;
-        else{const dump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);chosen=dump!==undefined?dump:lowest(h,pi);}
-      }
-      // Second hand low → don't over-commit early
+      // Tactic 9: Hold-up in second hand — duck enemy master to strand entries
       else if(secondHandLow){
-        // Exception: if the enemy lead is very low (≤6), winning cheaply is fine
-        // since we won't be over-committing against a garbage lead
         const ledRank=G.trick.length>0?rv(G.trick[0].card.rank):0;
         if(ledRank<=6&&cheap!==null){
-          const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump&&rv(h[i].rank)<=9),G.leadSuit);
-          chosen=cheapNT!==null?cheapNT:(rv(h[cheap].rank)<=9&&h[cheap].suit!==G.trump?cheap:(lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi)));
-        } else {
-          const safeDump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);
-          chosen=safeDump!==undefined?safeDump:lowest(h,pi);
-        }
+          const cNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump&&rv(h[i].rank)<=9),G.leadSuit);
+          chosen=cNT!==null?cNT:(rv(h[cheap].rank)<=9&&h[cheap].suit!==G.trump?cheap:(lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi)));
+        } else {const sd=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);chosen=sd!==undefined?sd:lowest(h,pi);}
       }
-      // Sacrifice last trump for Inn → not worth it
-      // BUT: never sacrifice a 10 to preserve trump — that gives away real points
-      else if(lastTrumpSacrifice && cheap!==null && h[cheap]&&h[cheap].suit===G.trump){
-        const nonTrumpWin=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
-        // Dump lowest non-trump non-10 — if none exist, use the trump (don't dump the 10)
-        const safeDump=nonTrumpNonTen.length>0?lowestNonTen(h,nonTrumpNonTen):undefined;
-        if(nonTrumpWin!==null)chosen=nonTrumpWin;
-        else if(safeDump!==undefined)chosen=safeDump;
-        else chosen=cheap; // only option left is trump — use it, never the 10
+      else if(lastTrumpSacrifice&&cheap!==null&&h[cheap]&&h[cheap].suit===G.trump){
+        const ntw=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
+        const sd=nonTrumpNonTen.length>0?lowestNonTen(h,nonTrumpNonTen):undefined;
+        if(ntw!==null)chosen=ntw;else if(sd!==undefined)chosen=sd;else chosen=cheap;
       }
-      // Duck play → deliberately lose to avoid bad lead position
-      else if(duckWorthIt){
-        const safeDump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);
-        chosen=safeDump!==undefined?safeDump:lowest(h,pi);
+      else if(duckWorthIt){const sd=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);chosen=sd!==undefined?sd:lowest(h,pi);}
+      else if(endgameDefensive&&!facingSweep){chosen=lowestNonTen(h,pi)||lowest(h,pi);}
+      else if(facingSweep){const aw=cheapestWin(h,pi,G.leadSuit);chosen=aw!==null?aw:(lowestNonTen(h,pi)||lowest(h,pi));}
+      // Exact: last player has ten and is enemy
+      else if(lastPlayerHasTen&&lastPlayerIsAlly2===false&&cheap!==null&&!isLastToPlay){
+        const cNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);chosen=cNT!==null?cNT:cheap;
       }
-      // Endgame defensive → can afford to lose, play lowest
-      else if(endgameDefensive && !facingSweep){
-        chosen=lowestNonTen(h,pi)||lowest(h,pi);
-      }
-      // Sacrifice Dol prevention → facing 0-4 sweep, fight for any ten
-      else if(facingSweep){
-        // Desperate: use any card that can win, even trump, to avoid 0-4
-        const anyWin=cheapestWin(h,pi,G.leadSuit);
-        chosen=anyWin!==null?anyWin:(lowestNonTen(h,pi)||lowest(h,pi));
-      }
-      // Post-tens mode → strategic Inn collection
       else if(postTensMode){
-        if(cheap!==null){
-          // All tens played — win Inns for tiebreaker
-          // But prefer non-trump wins to preserve trump for guaranteed wins later
-          const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
-          chosen=cheapNT!==null?cheapNT:cheap;
-        } else {
-          // Can't win — dump absolute lowest, save any trump for future control
-          chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi);
-        }
+        if(cheap!==null){const cNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);chosen=cNT!==null?cNT:cheap;}
+        else{chosen=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi)||lowest(h,pi);}
       }
-      // Third hand high / endgame aggressive → go for the win
-      else if((thirdHandHigh||endgameAggressive) && cheap!==null){
-        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
-        chosen=cheapNT!==null?cheapNT:cheap;
-      }
-      else if(cheap!==null && isLastToPlay){
-        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);
-        chosen=cheapNT!==null?cheapNT:cheap;
-      } else if(cheap!==null && !isLastToPlay){
-        const cheapCard=h[cheap];
-        const cheapNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump&&rv(h[i].rank)<=9),G.leadSuit);
-        if(cheapNT!==null){
-          chosen=cheapNT;
-        } else if(rv(cheapCard.rank)<=9 && cheapCard.suit!==G.trump){
-          chosen=cheap;
-        } else {
-          const safeDump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);
-          chosen=safeDump!==undefined?safeDump:lowest(h,pi);
-        }
+      else if((thirdHandHigh||endgameAggressive)&&cheap!==null){const cNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);chosen=cNT!==null?cNT:cheap;}
+      else if(cheap!==null&&isLastToPlay){const cNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump),G.leadSuit);chosen=cNT!==null?cNT:cheap;}
+      else if(cheap!==null&&!isLastToPlay){
+        const cNT=cheapestWin(h,pi.filter(i=>h[i]&&h[i].suit!==G.trump&&rv(h[i].rank)<=9),G.leadSuit);
+        if(cNT!==null)chosen=cNT;
+        else if(rv(h[cheap].rank)<=9&&h[cheap].suit!==G.trump)chosen=cheap;
+        else{const sd=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:pi);chosen=sd!==undefined?sd:lowest(h,pi);}
       } else {
-        const safeDump=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:nonTens.length>0?nonTens:pi);
-        chosen=safeDump!==undefined?safeDump:lowest(h,pi);
+        const sd=lowestNonTen(h,nonTrumpNonTen.length>0?nonTrumpNonTen:nonTens.length>0?nonTens:pi);
+        chosen=sd!==undefined?sd:lowest(h,pi);
       }
 
-      // Safety: never dump a 10 when losing unless it's the only card
+      // Safety: never dump a 10 when losing
       if(h[chosen]&&h[chosen].rank==='10'&&nonTens.length>0&&nonTens.some(i=>pi.includes(i))){
-        const safeNonTen=lowestNonTen(h,pi.filter(i=>h[i]&&h[i].rank!=='10'));
-        if(safeNonTen!==undefined&&pi.includes(safeNonTen))chosen=safeNonTen;
+        const snt=lowestNonTen(h,pi.filter(i=>h[i]&&h[i].rank!=='10'));
+        if(snt!==undefined&&pi.includes(snt))chosen=snt;
       }
     }
 
-    // ── Universal 10 safety net ──
-    // If we ended up choosing a 10 and the risk is not 'safe', swap it out
-    // Prefer using trump to win the trick over sacrificing the 10 uselessly
+    // Universal 10 safety net
     if(h[chosen]&&h[chosen].rank==='10'){
       const risk=tenRisk(h[chosen]);
       if(risk!=='safe'){
-        const nonTenPi=pi.filter(i=>h[i]&&h[i].rank!=='10');
-        if(nonTenPi.length>0){
+        const ntPi=pi.filter(i=>h[i]&&h[i].rank!=='10');
+        if(ntPi.length>0){
           if(myTeamWinning){
-            // Team winning — dump lowest non-trump non-10 first, then non-trump
-            const safeDump=lowestNonTen(h,nonTenPi.filter(i=>h[i].suit!==G.trump));
-            const fallback=lowestNonTen(h,nonTenPi);
-            chosen=safeDump!==undefined?safeDump:(fallback!==undefined?fallback:nonTenPi[0]);
+            const sd=lowestNonTen(h,ntPi.filter(i=>h[i].suit!==G.trump));
+            const fb=lowestNonTen(h,ntPi);
+            chosen=sd!==undefined?sd:(fb!==undefined?fb:ntPi[0]);
           } else {
-            // Team losing — try to win cheaply with non-10
-            // Prefer trump win over dumping the 10 (trump protects less than a 10 is worth losing)
-            const cheapNonTen=cheapestWin(h,nonTenPi,G.leadSuit);
-            const cheapTrumpWin=cheapestWin(h,nonTenPi.filter(i=>h[i].suit===G.trump),G.leadSuit);
-            const cheapNonTrumpWin=cheapestWin(h,nonTenPi.filter(i=>h[i].suit!==G.trump),G.leadSuit);
-            if(cheapNonTrumpWin!==null)chosen=cheapNonTrumpWin; // prefer non-trump win
-            else if(cheapTrumpWin!==null)chosen=cheapTrumpWin;  // use trump to win rather than dump 10
-            else chosen=lowestNonTen(h,nonTenPi.filter(i=>h[i].suit!==G.trump))||
-                        lowestNonTen(h,nonTenPi)||nonTenPi[0]; // dump lowest non-10
+            const cNT=cheapestWin(h,ntPi.filter(i=>h[i].suit!==G.trump),G.leadSuit);
+            const cT=cheapestWin(h,ntPi.filter(i=>h[i].suit===G.trump),G.leadSuit);
+            if(cNT!==null)chosen=cNT;
+            else if(cT!==null)chosen=cT;
+            else chosen=lowestNonTen(h,ntPi.filter(i=>h[i].suit!==G.trump))||lowestNonTen(h,ntPi)||ntPi[0];
           }
         }
       }
     }
 
-    // ── Trump conservation: final pass ──
-    // If we've ended up choosing a trump but don't need to, swap for a non-trump
-    // CRITICAL: never swap trump for a 10 — that sacrifices real points to save trump
+    // Trump conservation final pass
     if(h[chosen]&&h[chosen].suit===G.trump){
-      const nonTrumpPi=pi.filter(i=>h[i]&&h[i].suit!==G.trump&&h[i].rank!=='10');
-      if(nonTrumpPi.length>0){
+      const ntPi=pi.filter(i=>h[i]&&h[i].suit!==G.trump&&h[i].rank!=='10');
+      if(ntPi.length>0){
         const shouldSave=(!trickHasTen)||(myTeamWinning&&!isLastToPlay);
         if(shouldSave){
-          const cheapNT=cheapestWin(h,nonTrumpPi,G.leadSuit);
-          if(cheapNT!==null)chosen=cheapNT;
-          else{const alt=lowestNonTen(h,nonTrumpPi);if(alt!==undefined)chosen=alt;}
+          const cNT=cheapestWin(h,ntPi,G.leadSuit);
+          if(cNT!==null)chosen=cNT;
+          else{const alt=lowestNonTen(h,ntPi);if(alt!==undefined)chosen=alt;}
         }
       }
     }
   }
 
-  if(chosen===undefined)chosen=pi[0]; // final safety net
+  // Final safety net: catch null, undefined, and out-of-bounds indices
+  if(chosen==null||!pi.includes(chosen))chosen=pi[0];
+  if(chosen===undefined||G.hands[p][chosen]===undefined)chosen=pi.find(i=>G.hands[p][i]!==undefined);
+  if(chosen===undefined)chosen=0; // absolute fallback
   play(p,chosen);
 }
+
+
 
 </script>
 
