@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Dol</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Cinzel:wght@400;600&family=Cormorant+Garamond:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --felt:#14381f;--felt2:#1a4a28;--felt3:#0e2416;
+  --gold:#d4a843;--gold2:#f0c84a;--gold3:#8a6520;
+  --cream:#fdf8ee;--red:#c41f1f;--ink:#12100a;
+  --text:#ede0c4;--dim:#7a9070;--faint:#3d5a40;
+  --ally:#2e7eb8;--opp:#c44a2a;
+  --rim:#c49a3c;--rim2:#8b5e1a;
+  --bg:#060c08;
+  --card-w:58px;--card-h:84px;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bot:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);}
+body{font-family:'Cormorant Garamond',Georgia,serif;display:flex;flex-direction:column;height:100dvh;}
+
+/* ══════════════ SCREENS ══════════════ */
+.screen{
+  position:fixed;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(6,12,8,0.97);z-index:100;
+  padding:24px;
+  padding-top:calc(24px + var(--safe-top));
+  padding-bottom:calc(24px + var(--safe-bot));
+}
+.screen.hidden{display:none!important;}
+
+/* ── START ── */
+#start-screen{gap:8px;text-align:center;}
+.game-title{
+  font-family:'Cinzel Decorative',serif;
+  font-size:clamp(3rem,12vw,5rem);
+  color:var(--gold);
+  letter-spacing:0.15em;
+  text-shadow:0 0 60px rgba(212,168,67,0.5),0 4px 0 rgba(0,0,0,0.6);
+  margin-bottom:4px;
+}
+.game-sub{font-family:'Cinzel',serif;font-size:clamp(0.55rem,2vw,0.7rem);letter-spacing:0.4em;color:var(--dim);text-transform:uppercase;margin-bottom:32px;}
+.btn{
+  font-family:'Cinzel',serif;font-size:clamp(0.75rem,3vw,0.9rem);font-weight:600;
+  color:var(--ink);background:linear-gradient(150deg,var(--gold2),var(--gold),var(--gold3));
+  border:none;padding:14px 40px;border-radius:4px;cursor:pointer;
+  letter-spacing:0.15em;text-transform:uppercase;
+  box-shadow:0 3px 0 rgba(0,0,0,0.5),0 8px 32px rgba(212,168,67,0.3);
+  transition:transform 0.1s,box-shadow 0.1s;
+  min-height:52px;
+}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,0.5);}
+.btn-ghost{
+  font-family:'Cinzel',serif;font-size:clamp(0.65rem,2.5vw,0.78rem);
+  color:var(--dim);background:transparent;border:1px solid rgba(255,255,255,0.1);
+  padding:12px 32px;border-radius:4px;cursor:pointer;letter-spacing:0.12em;text-transform:uppercase;
+  min-height:48px;transition:border-color 0.2s,color 0.2s;
+}
+.btn-ghost:active{border-color:var(--gold);color:var(--gold);}
+.start-btns{display:flex;flex-direction:column;gap:12px;width:100%;max-width:280px;align-items:center;}
+
+/* ── DRAW SCREEN ── */
+#draw-screen{gap:12px;}
+.screen-title{font-family:'Cinzel',serif;font-size:clamp(1rem,4vw,1.3rem);color:var(--gold);letter-spacing:0.1em;text-align:center;}
+.screen-sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:clamp(0.8rem,3vw,1rem);color:var(--dim);text-align:center;}
+/* Draw grid: all 4 players in a single row, evenly spaced */
+.draw-grid{
+  display:flex;flex-direction:row;align-items:flex-end;justify-content:center;
+  gap:10px;width:100%;flex-wrap:nowrap;padding:0 8px;
+}
+.draw-slot{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto;}
+.draw-slot.you-slot{order:-1;} /* You always first */
+.draw-label{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;color:var(--dim);text-transform:uppercase;}
+.draw-label.you-label{color:var(--gold);}
+.draw-card{
+  width:70px;height:100px;border-radius:10px;
+  position:relative;cursor:pointer;
+  box-shadow:0 4px 20px rgba(0,0,0,0.6);
+  transition:transform 0.22s cubic-bezier(.2,.8,.4,1);
+}
+/* Draw card face — sized for draw cards */
+.draw-card .cf-rank{font-size:0.85rem;font-weight:700;line-height:1;}
+.draw-card .cf-suit-sm{font-size:0.65rem;line-height:1;}
+.draw-card .cf-suit-lg{font-size:1.5rem;line-height:1;}
+.draw-card .cf-corner.tl{top:4px;left:5px;}
+.draw-card .cf-corner.br{bottom:4px;right:5px;}
+.draw-card:active{transform:scale(0.96);}
+.card-back{
+  position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(145deg,#1a3670,#1e3f80);
+  border:2px solid rgba(255,255,255,0.15);
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity 0.3s;
+}
+.card-back::before{
+  content:'';position:absolute;inset:5px;border:1px solid rgba(255,255,255,0.1);border-radius:6px;
+  background:repeating-linear-gradient(-45deg,transparent,transparent 3px,rgba(255,255,255,0.03) 3px,rgba(255,255,255,0.03) 6px);
+}
+.card-back::after{content:'✦';color:rgba(255,255,255,0.2);font-size:2rem;position:relative;z-index:1;}
+.you-slot .card-back{border-color:rgba(212,168,67,0.4);background:linear-gradient(145deg,#162d5e,#1a3572);}
+.tap-to-flip{
+  position:absolute;bottom:8px;left:0;right:0;text-align:center;
+  font-family:'Cinzel',serif;font-size:0.38rem;letter-spacing:0.1em;color:rgba(212,168,67,0.8);
+  z-index:2;
+}
+.card-front{
+  position:absolute;inset:0;border-radius:inherit;
+  background:var(--cream);border:1px solid rgba(0,0,0,0.1);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity 0.3s;
+  overflow:hidden;
+}
+.draw-card.revealed .card-back{opacity:0;}
+.draw-card.revealed .card-front{opacity:1;}
+.draw-card.winner-card .card-front{box-shadow:0 0 24px rgba(212,168,67,1),inset 0 0 0 2px var(--gold);}
+#draw-result{font-family:'Cinzel',serif;font-size:clamp(0.8rem,3vw,1rem);color:var(--gold2);text-align:center;min-height:1.4em;}
+
+/* ── TRUMP SCREEN ── */
+#trump-screen{gap:20px;}
+#trump-hand-preview{
+  display:flex;justify-content:center;gap:-8px;
+  margin-bottom:8px;
+}
+.suit-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:300px;}
+.suit-btn{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:16px 8px;border-radius:12px;border:1px solid transparent;
+  cursor:pointer;background:rgba(255,255,255,0.05);
+  transition:all 0.18s;
+}
+.suit-btn:active{transform:scale(0.96);}
+.suit-btn.red-suit{color:var(--red);border-color:rgba(196,31,31,0.35);}
+.suit-btn.blk-suit{color:var(--text);border-color:rgba(240,224,188,0.2);}
+.suit-btn:active,.suit-btn:hover{border-color:var(--gold);background:rgba(212,168,67,0.12);}
+.suit-sym{font-size:2.4rem;line-height:1;}
+.suit-name{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;}
+
+/* ══════════════ GAME UI ══════════════ */
+#game{
+  display:none;
+  flex-direction:column;
+  height:100dvh;
+  overflow:hidden;
+}
+#game.active{display:flex;}
+
+/* ── TOP BAR ── */
+#topbar{
+  flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(0,0,0,0.7);
+  border-bottom:1px solid rgba(212,168,67,0.15);
+  padding:6px 12px;
+  padding-top:calc(6px + var(--safe-top));
+  gap:8px;
+}
+.team-score{display:flex;flex-direction:column;align-items:center;}
+.team-lbl{font-family:'Cinzel',serif;font-size:0.4rem;letter-spacing:0.14em;color:var(--dim);text-transform:uppercase;}
+.team-val{font-family:'Cinzel Decorative',serif;font-size:1.4rem;color:var(--gold);line-height:1;}
+.team-val.ours{color:var(--gold2);}
+#trump-display{display:flex;flex-direction:column;align-items:center;gap:1px;}
+.trump-lbl{font-family:'Cinzel',serif;font-size:0.38rem;letter-spacing:0.14em;color:var(--faint);text-transform:uppercase;}
+.trump-val{display:flex;align-items:center;gap:4px;}
+.trump-sym{font-size:1.3rem;line-height:1;}
+.trump-name{font-family:'Cinzel',serif;font-size:0.65rem;color:var(--gold);font-weight:600;}
+
+/* ── TABLE AREA ── */
+#table-area{
+  flex:1;min-height:0;
+  position:relative;
+  background:radial-gradient(ellipse at 50% 35%,var(--felt2) 0%,var(--felt) 55%,var(--felt3) 100%);
+  overflow:hidden;
+}
+/* felt texture */
+#table-area::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:
+    repeating-linear-gradient(0deg,rgba(0,0,0,0.025) 0,rgba(0,0,0,0.025) 1px,transparent 1px,transparent 3px),
+    repeating-linear-gradient(90deg,rgba(0,0,0,0.025) 0,rgba(0,0,0,0.025) 1px,transparent 1px,transparent 3px);
+}
+#table-area::after{
+  content:'✦';position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);
+  font-size:5rem;color:rgba(255,255,255,0.02);pointer-events:none;
+}
+
+/* ── OPPONENTS ── proper table seating ── */
+#opponents{
+  position:absolute;inset:0;
+  pointer-events:none;
+}
+.opp-slot{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  pointer-events:all;
+  position:absolute;
+}
+/* Ally sits directly across from you — top-centre */
+.opp-slot.ally-slot{
+  top:8px;left:50%;transform:translateX(-50%);
+}
+/* Opp Left — left side, vertically centred */
+#slot-l{
+  left:6px;top:50%;transform:translateY(-50%);
+}
+/* Opp Right — right side, vertically centred */
+#slot-r{
+  right:6px;top:50%;transform:translateY(-50%);
+}
+.opp-av{
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(0,0,0,0.55);border:2px solid rgba(212,168,67,0.25);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.2rem;position:relative;
+  transition:border-color 0.2s,box-shadow 0.2s;
+}
+.opp-av.active-av{
+  border-color:var(--gold);
+  box-shadow:0 0 0 2px rgba(212,168,67,0.3),0 0 18px rgba(212,168,67,0.7);
+  animation:av-pulse 1.4s ease-in-out infinite;
+}
+.opp-av.ally-av{border-color:rgba(46,126,184,0.5);}
+@keyframes av-pulse{0%,100%{box-shadow:0 0 0 2px rgba(212,168,67,0.3),0 0 14px rgba(212,168,67,0.5);}50%{box-shadow:0 0 0 4px rgba(212,168,67,0.15),0 0 28px rgba(212,168,67,0.8);}}
+.trump-star{
+  position:absolute;bottom:-3px;right:-3px;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--gold);border:1.5px solid var(--ink);
+  font-size:0.5rem;display:flex;align-items:center;justify-content:center;color:var(--ink);
+}
+.opp-name{font-family:'Cinzel',serif;font-size:0.38rem;letter-spacing:0.1em;color:var(--text);text-transform:uppercase;}
+.opp-badges{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin-top:2px;}
+.badge{
+  font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.04em;
+  padding:2px 7px;border-radius:8px;white-space:nowrap;line-height:1.4;
+}
+.d-badge{background:rgba(212,168,67,0.15);border:1px solid rgba(212,168,67,0.35);color:var(--gold);}
+.i-badge{background:rgba(46,126,184,0.15);border:1px solid rgba(46,126,184,0.35);color:var(--ally);}
+.d-badge.lit{background:rgba(212,168,67,0.32);border-color:var(--gold);color:var(--gold2);}
+.i-badge.lit{background:rgba(46,126,184,0.32);border-color:var(--ally);}
+/* Your team badges — slightly bigger since they're your own */
+#your-info .badge{font-size:0.58rem;padding:3px 9px;}
+/* bot card backs */
+.bot-cards{display:flex;margin-top:2px;}
+.bot-card{
+  width:12px;height:18px;border-radius:2px;margin:0 -2px;
+  background:linear-gradient(145deg,#1a3670,#1e3f80);
+  border:1px solid rgba(255,255,255,0.12);
+  box-shadow:1px 1px 3px rgba(0,0,0,0.5);
+}
+
+/* ── PLAY AREA (centre) ── */
+#play-area{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:220px;height:200px;
+  display:flex;align-items:center;justify-content:center;
+}
+.played-card{
+  position:absolute;
+  width:54px;height:78px;
+  border-radius:7px;
+  background:var(--cream);
+  border:1px solid rgba(0,0,0,0.12);
+  box-shadow:2px 4px 14px rgba(0,0,0,0.6);
+  overflow:hidden;
+  will-change:transform,opacity;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+  animation:card-drop 0.32s cubic-bezier(.2,.9,.3,1) both;
+}
+.played-card.win-card{
+  box-shadow:0 0 22px rgba(212,168,67,0.9),2px 4px 12px rgba(0,0,0,0.4);
+  border:1px solid var(--gold);
+  transition:box-shadow 0.3s ease,border 0.3s ease;
+}
+@keyframes card-drop{
+  from{opacity:0;transform:translateY(-24px) scale(0.7);}
+  to{opacity:1;}
+}
+
+/* ── STATUS ── */
+#status-bar{
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--dim);background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.06);
+  padding:5px 14px;border-radius:20px;white-space:nowrap;z-index:5;
+  transition:color 0.3s;
+}
+#status-bar.your-turn{color:var(--gold);border-color:rgba(212,168,67,0.3);animation:s-glow 1.6s ease-in-out infinite;}
+@keyframes s-glow{0%,100%{box-shadow:none;}50%{box-shadow:0 0 14px rgba(212,168,67,0.35);}}
+
+/* ── BOTTOM PANEL ── */
+#bottom-panel{
+  flex-shrink:0;
+  background:rgba(0,0,0,0.5);
+  border-top:1px solid rgba(212,168,67,0.15);
+}
+#your-info{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:5px 12px;border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.you-badges{display:flex;gap:6px;align-items:center;}
+.you-lbl{font-family:'Cinzel',serif;font-size:0.4rem;letter-spacing:0.1em;color:var(--dim);text-transform:uppercase;}
+#round-info{font-family:'Cinzel',serif;font-size:0.38rem;letter-spacing:0.08em;color:var(--faint);text-transform:uppercase;}
+
+/* ── HAND ── */
+#hand-area{
+  display:flex;align-items:flex-end;justify-content:center;
+  padding:8px 6px;
+  padding-bottom:calc(10px + var(--safe-bot));
+  min-height:110px;
+  overflow:visible;
+  max-width:100vw;
+  width:100%;
+}
+.hand-card{
+  /* Large enough to read clearly on any phone */
+  width:60px;height:88px;
+  border-radius:9px;
+  background:var(--cream);
+  border:1px solid rgba(0,0,0,0.15);
+  box-shadow:2px 4px 12px rgba(0,0,0,0.65);
+  position:relative;flex-shrink:0;cursor:pointer;
+  overflow:hidden;
+  transition:transform 0.2s cubic-bezier(.34,1.4,.64,1),box-shadow 0.2s ease;
+  will-change:transform;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+}
+.hand-card:active{transform:translateY(-22px) scale(1.1)!important;box-shadow:2px 12px 28px rgba(0,0,0,0.85);z-index:30;}
+.hand-card.unplayable{opacity:0.4;cursor:not-allowed;}
+.hand-card.unplayable:active{transform:none!important;}
+.hand-card.is-trump{
+  border-color:rgba(212,168,67,0.6);
+  box-shadow:2px 4px 12px rgba(0,0,0,0.65),0 0 10px rgba(212,168,67,0.3);
+}
+
+/* ── CARD FACE — large readable text ── */
+.cf-corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:1;}
+.cf-corner.tl{top:4px;left:4px;}
+.cf-corner.br{bottom:4px;right:4px;transform:rotate(180deg);}
+/* Corner rank & suit — compact, readable */
+.cf-rank{
+  font-family:'Cinzel',serif;
+  font-size:0.82rem;
+  font-weight:700;
+  line-height:1;
+  letter-spacing:-0.02em;
+}
+.cf-suit-sm{font-size:0.62rem;line-height:1;}
+/* Centre suit — larger but constrained to middle zone of card */
+.cf-suit-lg{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  font-size:1.6rem;
+  line-height:1;
+  pointer-events:none;
+}
+/* Played card — smaller cards */
+.played-card .cf-rank{font-size:0.65rem;}
+.played-card .cf-suit-sm{font-size:0.52rem;}
+.played-card .cf-suit-lg{font-size:1.15rem;}
+
+/* ── RESULT SCREEN ── */
+#result-screen{gap:14px;}
+#result-screen .screen-title{font-size:clamp(1.2rem,5vw,1.6rem);}
+.result-card-box{
+  background:rgba(10,22,12,0.95);border:1px solid rgba(212,168,67,0.3);
+  border-radius:16px;padding:20px;width:100%;max-width:340px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.result-teams{display:flex;gap:14px;}
+.rt-blk{flex:1;text-align:center;padding:12px 8px;border-radius:10px;}
+.rt-blk.ours{background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.2);}
+.rt-blk.theirs{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);}
+.rt-lbl{font-family:'Cinzel',serif;font-size:0.42rem;letter-spacing:0.16em;color:var(--dim);text-transform:uppercase;margin-bottom:6px;}
+.rt-suits{font-size:1.1rem;display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-bottom:3px;min-height:1.4rem;}
+.rt-detail{font-family:'Cinzel',serif;font-size:0.5rem;color:var(--ally);letter-spacing:0.04em;margin-bottom:6px;}
+.rt-pts{font-family:'Cinzel Decorative',serif;font-size:1.8rem;color:var(--gold);line-height:1;}
+.rt-pts.loss{color:var(--dim);}
+.rt-pts-lbl{font-family:'Cinzel',serif;font-size:0.4rem;color:var(--dim);letter-spacing:0.1em;text-transform:uppercase;}
+.result-div{height:1px;background:linear-gradient(to right,transparent,rgba(212,168,67,0.25),transparent);}
+.result-total{text-align:center;}
+.result-total-lbl{font-family:'Cinzel',serif;font-size:0.45rem;letter-spacing:0.14em;color:var(--dim);text-transform:uppercase;}
+.result-total-val{font-family:'Cinzel',serif;font-size:1.4rem;color:var(--gold2);}
+.decider-msg{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:0.85rem;color:var(--dim);text-align:center;}
+/* round history */
+#round-hist{width:100%;max-width:340px;display:flex;flex-direction:column;gap:2px;max-height:100px;overflow-y:auto;}
+.hist-row{display:flex;justify-content:space-between;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,0.04);font-family:'Cinzel',serif;font-size:0.42rem;color:var(--dim);}
+.hist-row .hw{color:var(--gold);}
+
+/* ── GAME OVER ── */
+#gameover-screen{gap:16px;text-align:center;}
+.go-msg{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.2rem;color:var(--text);}
+.go-score{font-family:'Cinzel',serif;font-size:1.6rem;color:var(--gold2);}
+
+/* ── DEAL ANIMATION OVERLAY ── */
+#deal-anim{position:fixed;inset:0;pointer-events:none;z-index:50;}
+.anim-card{
+  position:absolute;
+  width:46px;height:66px;border-radius:6px;
+  background:linear-gradient(145deg,#1a3670,#1e3f80);
+  border:1px solid rgba(255,255,255,0.15);
+  box-shadow:2px 4px 10px rgba(0,0,0,0.6);
+  opacity:0;
+  will-change:transform,opacity;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+  transition:transform 0.35s cubic-bezier(.25,.85,.35,1),opacity 0.18s ease;
+}
+.anim-card.fly{opacity:1;}
+.anim-card.land{opacity:0;transition:opacity 0.14s ease 0.3s;}
+/* ── WAITING ROOM SEATS ── */
+.wait-seat{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(212,168,67,0.15);
+  border-radius:10px;padding:8px 10px;
+}
+.wait-seat.filled{border-color:rgba(212,168,67,0.3);background:rgba(212,168,67,0.06);}
+.wait-seat.mine{border-color:var(--gold);background:rgba(212,168,67,0.1);}
+.ws-avatar{
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(212,168,67,0.15);border:1px solid rgba(212,168,67,0.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;flex-shrink:0;
+}
+.ws-name{
+  font-family:'Cinzel',serif;font-size:0.62rem;
+  letter-spacing:0.06em;color:var(--gold);font-weight:600;
+}
+.ws-team{
+  font-family:'Cormorant Garamond',serif;font-size:0.7rem;
+  color:var(--dim);font-style:italic;
+}
+.ws-empty .ws-name{color:var(--faint);}
+
+</style>
+</head>
+<body>
+
+<!-- DEAL ANIMATION OVERLAY -->
+<div id="deal-anim"></div>
+
+<!-- START SCREEN -->
+<div class="screen" id="start-screen">
+  <div class="game-title">DOL</div>
+  <div class="game-sub">Collect the Tens · Claim the Houses</div>
+  <div class="start-btns">
+    <button class="btn" onclick="goToDraw()">Play vs Bots</button>
+    <button class="btn-ghost" onclick="goToMultiplayer()">Play Online</button>
+    <button class="btn-ghost" onclick="goToInfo()">How to Play</button>
+  </div>
+</div>
+
+<!-- HOW TO PLAY -->
+<div class="screen hidden" id="info-screen" style="gap:12px;overflow-y:auto;align-items:flex-start;padding:32px 20px;">
+  <div class="screen-title" style="align-self:center;">How to Play Dol</div>
+  <div style="font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--text);line-height:1.7;max-width:400px;margin:0 auto;">
+    <p><strong style="color:var(--gold)">Goal:</strong> First team to 21 points wins.</p><br>
+    <p><strong style="color:var(--gold)">Teams:</strong> You & Ally vs Opp Left & Opp Right.</p><br>
+    <p><strong style="color:var(--gold)">Dol vs Inn:</strong> A trick with a 10 is a Dol. Without a 10 it's an Inn.</p><br>
+    <p><strong style="color:var(--gold)">Scoring:</strong> 4 tens = 5pts · 3 tens = 4pts/1pt · 2 each = 3pts/2pts by Inn count.</p><br>
+    <p><strong style="color:var(--gold)">Rules:</strong> Follow the lead suit. If void, play anything — including trump. Trump beats all other suits.</p>
+  </div>
+  <button class="btn" onclick="showScreen('start-screen')" style="align-self:center;margin-top:8px;">Back</button>
+</div>
+
+<!-- DRAW SCREEN -->
+<div class="screen hidden" id="draw-screen">
+  <div class="screen-title">Draw for Trump Decider</div>
+  <div class="screen-sub">Highest card picks the trump suit</div>
+  <!-- Draw cards in one neat row: You · Ally · Opp Left · Opp Right -->
+  <div class="draw-grid" id="draw-grid">
+    <div class="draw-slot you-slot" id="draw-you-slot">
+      <div class="draw-label you-label">You</div>
+      <div class="draw-card" id="dc-0" onclick="flipYou()">
+        <div class="card-back"><span class="tap-to-flip">Tap</span></div>
+        <div class="card-front" id="df-0"></div>
+      </div>
+    </div>
+    <div class="draw-slot" id="draw-ally-slot">
+      <div class="draw-label">Ally</div>
+      <div class="draw-card" id="dc-1">
+        <div class="card-back"></div>
+        <div class="card-front" id="df-1"></div>
+      </div>
+    </div>
+    <div class="draw-slot" id="draw-oppl-slot">
+      <div class="draw-label">Opp L</div>
+      <div class="draw-card" id="dc-2">
+        <div class="card-back"></div>
+        <div class="card-front" id="df-2"></div>
+      </div>
+    </div>
+    <div class="draw-slot" id="draw-oppr-slot">
+      <div class="draw-label">Opp R</div>
+      <div class="draw-card" id="dc-3">
+        <div class="card-back"></div>
+        <div class="card-front" id="df-3"></div>
+      </div>
+    </div>
+  </div>
+  <div id="draw-result"></div>
+  <button class="btn hidden" id="draw-continue" onclick="afterDraw()">Continue →</button>
+</div>
+
+<!-- TRUMP PICK SCREEN -->
+<div class="screen hidden" id="trump-screen">
+  <div class="screen-title">Choose Trump Suit</div>
+  <div class="screen-sub">You have 5 cards — pick trump for this round</div>
+  <div id="trump-hand-row" style="display:flex;justify-content:center;gap:-6px;margin:8px 0;"></div>
+  <div class="suit-buttons">
+    <button class="suit-btn red-suit" onclick="pickTrump('♥','Hearts')"><span class="suit-sym">♥</span><span class="suit-name">Hearts</span></button>
+    <button class="suit-btn blk-suit" onclick="pickTrump('♠','Spades')"><span class="suit-sym">♠</span><span class="suit-name">Spades</span></button>
+    <button class="suit-btn red-suit" onclick="pickTrump('♦','Diamonds')"><span class="suit-sym">♦</span><span class="suit-name">Diamonds</span></button>
+    <button class="suit-btn blk-suit" onclick="pickTrump('♣','Clubs')"><span class="suit-sym">♣</span><span class="suit-name">Clubs</span></button>
+  </div>
+</div>
+
+<!-- GAME UI -->
+<div id="game">
+  <!-- Top bar -->
+  <div id="topbar">
+    <div class="team-score">
+      <div class="team-lbl">Their Team</div>
+      <div class="team-val" id="sc-t">0</div>
+    </div>
+    <div id="trump-display">
+      <div class="trump-lbl">Trump</div>
+      <div class="trump-val">
+        <span class="trump-sym" id="trump-sym">?</span>
+        <span class="trump-name" id="trump-name">—</span>
+      </div>
+    </div>
+    <div class="team-score">
+      <div class="team-lbl">Your Team</div>
+      <div class="team-val ours" id="sc-y">0</div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div id="table-area">
+    <!-- Opponents -->
+    <div id="opponents">
+      <!-- Opp Left -->
+      <div class="opp-slot" id="slot-l">
+        <div class="opp-av" id="av-l">♦</div>
+        <div class="opp-name">Opp Left</div>
+        <div class="opp-badges">
+          <span class="badge d-badge" id="db-l">0✦</span>
+          <span class="badge i-badge" id="ib-l">0</span>
+        </div>
+        <div class="bot-cards" id="bc-l"></div>
+      </div>
+      <!-- Ally (centre top) -->
+      <div class="opp-slot ally-slot" id="slot-t">
+        <div class="opp-av ally-av" id="av-t">♣</div>
+        <div class="opp-name">Ally</div>
+        <div class="opp-badges">
+          <span class="badge d-badge" id="db-t">0✦</span>
+          <span class="badge i-badge" id="ib-t">0</span>
+        </div>
+        <div class="bot-cards" id="bc-t"></div>
+      </div>
+      <!-- Opp Right -->
+      <div class="opp-slot" id="slot-r">
+        <div class="opp-av" id="av-r">♥</div>
+        <div class="opp-name">Opp Right</div>
+        <div class="opp-badges">
+          <span class="badge d-badge" id="db-r">0✦</span>
+          <span class="badge i-badge" id="ib-r">0</span>
+        </div>
+        <div class="bot-cards" id="bc-r"></div>
+      </div>
+    </div>
+
+    <!-- Play area -->
+    <div id="play-area"></div>
+
+    <!-- Status -->
+    <div id="status-bar">Your turn</div>
+  </div>
+
+  <!-- Bottom panel -->
+  <div id="bottom-panel">
+    <div id="your-info">
+      <div class="you-badges">
+        <span class="you-lbl">You & Ally</span>
+        <span class="badge d-badge" id="db-y">0✦</span>
+        <span class="badge i-badge" id="ib-y">0</span>
+      </div>
+      <div id="round-info">Round 1</div>
+    </div>
+    <div id="hand-area"></div>
+  </div>
+</div>
+
+<!-- RESULT SCREEN -->
+<div class="screen hidden" id="result-screen">
+  <div class="screen-title" id="result-title">Round 1 Over</div>
+  <div class="result-card-box">
+    <div class="result-teams">
+      <div class="rt-blk ours">
+        <div class="rt-lbl">You & Ally</div>
+        <div class="rt-suits" id="rt-your-suits"></div>
+        <div class="rt-detail" id="rt-your-detail"></div>
+        <div class="rt-pts" id="rt-your-pts">0</div>
+        <div class="rt-pts-lbl">points</div>
+      </div>
+      <div class="rt-blk theirs">
+        <div class="rt-lbl">Their Team</div>
+        <div class="rt-suits" id="rt-their-suits"></div>
+        <div class="rt-detail" id="rt-their-detail"></div>
+        <div class="rt-pts loss" id="rt-their-pts">0</div>
+        <div class="rt-pts-lbl">points</div>
+      </div>
+    </div>
+    <div class="result-div"></div>
+    <div class="result-total">
+      <div class="result-total-lbl">Total Score</div>
+      <div class="result-total-val" id="rt-total">0 — 0</div>
+    </div>
+  </div>
+  <div class="decider-msg" id="decider-msg"></div>
+  <div id="round-hist"></div>
+  <button class="btn" onclick="nextRound()">Next Round</button>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div class="screen hidden" id="gameover-screen">
+  <div class="game-title" style="font-size:clamp(2rem,10vw,3.5rem);">DOL</div>
+  <div class="go-msg" id="go-msg">Game Over</div>
+  <div class="go-score" id="go-score"></div>
+  <button class="btn" onclick="location.reload()">Play Again</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+
+// ══════════════════════════════════════════
+//  DOL CARD GAME — MOBILE
+//  Rules: 4p 2v2, CCW turns (0→3→1→2)
+//  Dol=trick with ≥1 ten, Inn=trick without
+//  Score: 4tens=5, 3tens=4/1, 2-2 by Inns
+//  First to 21 wins
+// ══════════════════════════════════════════
+
+const SUITS=['♠','♥','♦','♣'];
+const SNAMES={'♠':'Spades','♥':'Hearts','♦':'Diamonds','♣':'Clubs'};
+const RV={'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
+const ORDER=[0,3,1,2]; // CCW
+const TEAMMATE={0:1,1:0,2:3,3:2};
+const RIGHTOPP={0:3,1:2,2:0,3:1};
+const LEFTOPP={0:2,1:3,2:1,3:0};
+const PNAMES=['You','Ally','Opp Left','Opp Right'];
+const IS_RED=s=>s==='♥'||s==='♦';
+
+let G={},drawCards=[],flipped=0,drawPlayers=[0,1,2,3],botTimer=null,tZ=1;
+
+// ── Safe DOM helpers ──
+const $=id=>document.getElementById(id);
+function setText(id,v){const e=$(id);if(e)e.textContent=v;}
+function setHTML(id,v){const e=$(id);if(e)e.innerHTML=v;}
+function toggleCls(id,cls,v){const e=$(id);if(e)e.classList.toggle(cls,v);}
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  const s=$(id);if(s)s.classList.remove('hidden');
+}
+function sched(fn,ms){if(botTimer)clearTimeout(botTimer);botTimer=setTimeout(()=>{botTimer=null;fn();},ms);}
+
+// ── Card helpers ──
+function newDeck(){
+  const d=[];
+  for(const s of SUITS)for(const r of Object.keys(RV))d.push({suit:s,rank:r});
+  for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]];}
+  return d;
+}
+function sort(h){return [...h].sort((a,b)=>{const sd=SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit);return sd||RV[b.rank]-RV[a.rank];});}
+function isTrump(c){return c.suit===G.trump;}
+function isRed(c){return IS_RED(c.suit);}
+function rv(r){return RV[r]||0;}
+function cc(c){return isRed(c)?'red-card':'blk-card';}
+
+function cardFaceHTML(card,small=false){
+  const col=IS_RED(card.suit)?'#c0151a':'#0a0806';
+  const fsz=small?'0.65rem':'';
+  const rankSz=fsz?`font-size:${fsz};`:'';
+  const suitSmSz=fsz?`font-size:${fsz};`:'';
+  const suitLgSz=fsz?`font-size:${fsz};`:'';
+  return `<div class="cf-corner tl"><div class="cf-rank" style="color:${col};${rankSz}">${card.rank}</div><div class="cf-suit-sm" style="color:${col};${suitSmSz}">${card.suit}</div></div>
+  <div class="cf-suit-lg" style="color:${col};${suitLgSz}">${card.suit}</div>
+  <div class="cf-corner br"><div class="cf-rank" style="color:${col};${rankSz}">${card.rank}</div><div class="cf-suit-sm" style="color:${col};${suitSmSz}">${card.suit}</div></div>`;
+}
+
+function drawCardFaceHTML(card){
+  const col=IS_RED(card.suit)?'#c0151a':'#0a0806';
+  return `<div class="cf-corner tl" style="top:5px;left:6px;"><div class="cf-rank" style="color:${col}">${card.rank}</div><div class="cf-suit-sm" style="color:${col}">${card.suit}</div></div>
+  <div class="cf-suit-lg" style="color:${col}">${card.suit}</div>
+  <div class="cf-corner br" style="bottom:5px;right:6px;transform:rotate(180deg);"><div class="cf-rank" style="color:${col}">${card.rank}</div><div class="cf-suit-sm" style="color:${col}">${card.suit}</div></div>`;
+}
+
+// ── SCREENS ──
+function goToInfo(){showScreen('info-screen');}
+function goToDraw(){
+  drawCards=[];flipped=0;drawPlayers=[0,1,2,3];
+  const deck=newDeck();
+  for(let i=0;i<4;i++)drawCards[i]=deck[i];
+  // Lay out draw grid — 4 slots
+  $('draw-oppr-slot').style.display='flex';
+  $('draw-you-slot').style.gridColumn='1/-1';
+  // Set card fronts
+  for(let i=1;i<4;i++){
+    const cf=$('df-'+i);
+    if(cf){cf.className=`card-front ${cc(drawCards[i].suit)}`;cf.innerHTML=drawCardFaceHTML(drawCards[i]);}
+  }
+  $('draw-result').textContent='';
+  $('draw-continue').classList.add('hidden');
+  showScreen('draw-screen');
+  // Flip bots after short delay
+  [1,2,3].forEach((p,i)=>setTimeout(()=>flipBot(p),(i+1)*600));
+}
+
+function flipBot(p){
+  const el=$('dc-'+p);
+  if(el)el.classList.add('revealed');
+  flipped++;
+  if(flipped>=drawPlayers.length)setTimeout(revealWinner,500);
+}
+
+function flipYou(){
+  const el=$('dc-0');
+  if(!el||el.classList.contains('revealed'))return;
+  const cf=$('df-0');
+  if(cf){cf.className=`card-front ${cc(drawCards[0].suit)}`;cf.innerHTML=drawCardFaceHTML(drawCards[0]);}
+  el.classList.add('revealed');
+  flipped++;
+  if(flipped>=drawPlayers.length)setTimeout(revealWinner,500);
+}
+
+function revealWinner(){
+  const maxV=Math.max(...drawPlayers.map(p=>rv(drawCards[p].rank)));
+  const tied=drawPlayers.filter(p=>rv(drawCards[p].rank)===maxV);
+  if(tied.length>1){
+    $('draw-result').textContent=`Tie between ${tied.map(p=>PNAMES[p]).join(' & ')} — redrawing!`;
+    setTimeout(()=>redrawTied(tied),1400);
+    return;
+  }
+  const w=tied[0];
+  $('dc-'+w).style.boxShadow='0 0 24px rgba(212,168,67,0.9)';
+  const msg=w===0?`You drew ${drawCards[0].rank}${drawCards[0].suit} — you pick trump!`:`${PNAMES[w]} drew ${drawCards[w].rank}${drawCards[w].suit} — they pick trump`;
+  $('draw-result').textContent=msg;
+  $('draw-continue').classList.remove('hidden');
+  G.trumpDecider=w;
+}
+
+function redrawTied(tied){
+  const deck=newDeck();
+  tied.forEach(p=>{drawCards[p]=deck.pop();});
+  $('draw-result').textContent='';
+  flipped=0;drawPlayers=tied;
+  tied.forEach(p=>{
+    const el=$('dc-'+p);if(el)el.classList.remove('revealed');
+    // Pre-populate card face HTML so it's ready when the card is flipped
+    const cf=$('df-'+p);
+    if(cf){cf.className=`card-front ${cc(drawCards[p].suit)}`;cf.innerHTML=drawCardFaceHTML(drawCards[p]);}
+  });
+  const bots=tied.filter(p=>p!==0);
+  bots.forEach((p,i)=>setTimeout(()=>flipBot(p),(i+1)*600));
+  if(!tied.includes(0))setTimeout(revealWinner,(bots.length+1)*600);
+}
+
+function afterDraw(){
+  G.yourScore=0;G.theirScore=0;G.round=1;G.roundHistory=[];
+  initRound();
+}
+
+// ══════════════ ROUND LOGIC ══════════════
+function initRound(){
+  const deck=newDeck();
+  G.deck=deck;
+  G.hands=[[],[],[],[]];
+  G.trick=[];G.leadSuit=null;
+  G.currentPlayer=G.trumpDecider;
+  G.yourDols=0;G.theirDols=0;G.yourInns=0;G.theirInns=0;
+  G.yourTens=0;G.theirTens=0;
+  G.yourDolSuits=[];G.theirDolSuits=[];
+  G.voidTracker={};G.discardTracker={};
+  G.tricks=0;G.awaiting=false;G.trump=null;
+  G.playedCards=[];G.tensOut=0;
+  G.voidTracker={};
+  if(!Array.isArray(G.roundHistory))G.roundHistory=[];
+  // Deal 5 each
+  for(let p=0;p<4;p++)for(let i=0;i<5;i++)G.hands[p].push(deck.pop());
+  // Show game UI
+  $('game').classList.add('active');
+  showScreen(null); // hide all screens
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  updateTrumpDisplay();
+  updateUI();
+  renderBots();
+  // Animate first deal
+  animateDeal(5,()=>{
+    G.hands[0]=sort(G.hands[0]);
+    renderHand();
+    if(G.trumpDecider===0){
+      showTrumpPicker();
+    } else {
+      setStatus(`${PNAMES[G.trumpDecider]} is choosing trump...`,false);
+      setTimeout(()=>{G.trump=botPickTrump(G.trumpDecider);finishDeal();},1200);
+    }
+  });
+}
+
+function botPickTrump(p){
+  const h=G.hands[p];
+  // Tactic 36+37: Use advanced trump scoring with position awareness
+  const scores={};
+  for(const s of SUITS){
+    scores[s]=scoreTrumpSuit(s,h);
+    // Bonus if ally also has length (coordination)
+    const ally=TEAMMATE[p];
+    if(G.hands[ally]){
+      const allyLen=G.hands[ally].filter(c=>c.suit===s).length;
+      if(allyLen>=3)scores[s]+=2; // combined trump length bonus
+    }
+    // Penalty for picking a suit where opponents have A-K
+    const isOppLocal=p===2||p===3;
+    const oppHasAK=[0,1,2,3].filter(e=>e!==ally&&e!==p).some(e=>
+      G.hands[e]&&G.hands[e].some(c=>c.suit===s&&c.rank==='A')&&
+      G.hands[e].some(c=>c.suit===s&&c.rank==='K')
+    );
+    if(oppHasAK)scores[s]-=3;
+  }
+  return Object.entries(scores).reduce((a,b)=>b[1]>a[1]?b:a)[0];
+}
+
+function showTrumpPicker(){
+  // Show hand preview
+  const row=$('trump-hand-row');
+  if(row){
+    row.innerHTML='';
+    const h=sort(G.hands[0]);
+    h.forEach((card,i)=>{
+      const el=document.createElement('div');
+      el.className=`hand-card ${cc(card)} ${isTrump(card)?'is-trump':''}`;
+      el.style.width='44px';el.style.height='64px';
+      el.style.marginLeft=i===0?'0':'-14px';
+      el.innerHTML=cardFaceHTML(card,true);
+      row.appendChild(el);
+    });
+  }
+  // Show trump screen on top of game — don't hide game
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  $('trump-screen').classList.remove('hidden');
+  document.getElementById('game').classList.add('active');
+}
+
+function pickTrump(suit,name){
+  G.trump=suit;
+  // Hide all screens (including trump-screen)
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  // Ensure game UI is visible
+  document.getElementById('game').classList.add('active');
+  finishDeal();
+}
+
+function finishDeal(){
+  updateTrumpDisplay();
+  // Deal 4+4 more
+  for(let p=0;p<4;p++)for(let i=0;i<4;i++)G.hands[p].push(G.deck.pop());
+  for(let p=0;p<4;p++)for(let i=0;i<4;i++)G.hands[p].push(G.deck.pop());
+  G.hands[0]=sort(G.hands[0]);
+  animateDeal(8,()=>{
+    renderBots();renderHand();startRound();
+  });
+}
+
+function updateTrumpDisplay(){
+  const sym=$('trump-sym'),name=$('trump-name');
+  if(sym)sym.textContent=G.trump||'?';
+  if(name)name.textContent=G.trump?SNAMES[G.trump]:'—';
+  if(sym&&G.trump)sym.style.color=IS_RED(G.trump)?'var(--red)':'var(--text)';
+}
+
+function startRound(){
+  setText('round-info',`Round ${G.round}`);
+  updateUI();renderBots();renderHand();
+  updateTrumpStar();
+  G.awaiting=G.currentPlayer===0;
+  if(G.currentPlayer===0){setStatus('Your turn — lead the first card',true);renderHand();}
+  else{setStatus(`${PNAMES[G.currentPlayer]} leads...`,false);sched(botPlay,1400);}
+}
+
+// ── DEAL ANIMATION ──
+function animateDeal(count,cb){
+  const overlay=$('deal-anim');
+  overlay.innerHTML='';
+  // Destination positions (centre of each player's area)
+  const W=window.innerWidth,H=window.innerHeight;
+  const DEST=[
+    {x:W/2-23,y:H-100},      // You (bottom)
+    {x:W/2-23,y:90},          // Ally (top centre)
+    {x:40,y:H/2-80},          // Opp Left
+    {x:W-86,y:H/2-80},        // Opp Right
+  ];
+  const SRC={x:W/2-23,y:H/2-33};
+  const seq=[];
+  const passSize=count===5?5:4;
+  const passes=count===5?1:2;
+  for(let pa=0;pa<passes;pa++)for(let oi=0;oi<4;oi++)for(let c=0;c<(count===5?5:4);c++)seq.push(ORDER[oi]);
+  // deduplicate to just count cards per player — simplified: animate count cards per player
+  const simpleSeq=[];
+  for(let c=0;c<count;c++)for(let oi=0;oi<4;oi++)simpleSeq.push(ORDER[oi]);
+  let i=0;
+  function next(){
+    if(i>=simpleSeq.length){setTimeout(()=>{overlay.innerHTML='';cb();},200);return;}
+    const p=simpleSeq[i++];
+    const d=DEST[p];
+    const el=document.createElement('div');
+    el.className='anim-card';
+    el.style.left=SRC.x+'px';el.style.top=SRC.y+'px';
+    overlay.appendChild(el);
+    requestAnimationFrame(()=>{
+      el.classList.add('fly');
+      el.style.transform=`translate(${d.x-SRC.x}px,${d.y-SRC.y}px)`;
+      setTimeout(()=>el.classList.add('land'),260);
+      setTimeout(next,85);
+    });
+  }
+  next();
+}
+
+// ── RENDER ──
+function renderHand(){
+  const h=G.hands[0];
+  const area=$('hand-area');
+  if(!area)return;
+  area.innerHTML='';
+  const playable=new Set(getPlayable());
+  const cw=60;  // card width
+  const pad=12; // horizontal padding total
+  const W=window.innerWidth-pad;
+  const totalW=h.length*cw;
+  // Overlap so all cards always fit within screen width
+  const ov=h.length>1?Math.max(0,Math.ceil((totalW-W)/(h.length-1))):0;
+  h.forEach((card,i)=>{
+    const can=playable.has(i)&&G.currentPlayer===0&&G.awaiting;
+    const el=document.createElement('div');
+    el.className=`hand-card ${cc(card)} ${isTrump(card)?'is-trump':''} ${can?'':'unplayable'}`;
+    el.style.marginLeft=i===0?'0':`-${ov}px`;
+    el.innerHTML=cardFaceHTML(card);
+    if(can)el.onclick=()=>play(0,i);
+    area.appendChild(el);
+  });
+}
+
+function getPlayable(){
+  const h=G.hands[0];
+  if(!G.leadSuit)return h.map((_,i)=>i);
+  const f=h.map((c,i)=>c.suit===G.leadSuit?i:-1).filter(i=>i>=0);
+  return f.length>0?f:h.map((_,i)=>i);
+}
+
+function renderBots(){
+  [{id:'bc-t',p:1},{id:'bc-l',p:2},{id:'bc-r',p:3}].forEach(({id,p})=>{
+    const el=$(id);if(!el)return;
+    el.innerHTML='';
+    const cnt=G.hands[p]?G.hands[p].length:0;
+    for(let i=0;i<cnt;i++){const d=document.createElement('div');d.className='bot-card';el.appendChild(d);}
+  });
+}
+
+// Fan positions for played cards
+// Fan offsets — each player's card fans outward from centre
+// You=bottom, Ally=top, OppLeft=left, OppRight=right
+const FAN=[
+  {x:'0px',  y:'38px',  r:'-4deg'},  // You — shifts down
+  {x:'0px',  y:'-38px', r:'4deg'},   // Ally — shifts up
+  {x:'-42px',y:'-8px',  r:'-8deg'},  // OppLeft — shifts left
+  {x:'42px', y:'-8px',  r:'8deg'},   // OppRight — shifts right
+];
+function renderPlayedCard(player,card,winner=false){
+  const area=$('play-area');if(!area)return;
+  const old=area.querySelector(`[data-p="${player}"]`);if(old)old.remove();
+  const el=document.createElement('div');
+  el.className=`played-card ${cc(card)} ${winner?'win-card':''}`;
+  el.dataset.p=player;
+  const f=FAN[player];
+  // Position at centre of play area, then fan outward
+  const cardW=54,cardH=78;
+  el.style.cssText=`
+    top:calc(50% - ${cardH/2}px);
+    left:calc(50% - ${cardW/2}px);
+    z-index:${tZ++};
+    transform:translateX(${f.x}) translateY(${f.y}) rotate(${f.r});
+  `.replace(/\s+/g,' ');
+  el.innerHTML=cardFaceHTML(card,false);
+  area.appendChild(el);
+}
+
+function clearPlayArea(){const a=$('play-area');if(a)a.innerHTML='';tZ=1;}
+
+function dolSuitsHTML(suits){
+  if(!suits||!suits.length)return'<span style="opacity:0.35">—</span>';
+  return suits.map(s=>`<span style="${IS_RED(s)?'color:var(--red)':'color:var(--ink);filter:invert(1) brightness(2)'}">${s}</span>`).join('');
+}
+
+function updateUI(){
+  const yd=G.yourDols||0,yi=G.yourInns||0,td=G.theirDols||0,ti=G.theirInns||0;
+  const yt=G.yourTens||0,tt=G.theirTens||0;
+  // Badges
+  const yBadge=`${yt}✦ ${dolSuitsHTML(G.yourDolSuits||[])}`;
+  const tBadge=`${tt}✦ ${dolSuitsHTML(G.theirDolSuits||[])}`;
+  setHTML('db-y',yBadge); toggleCls('db-y','lit',yd>0);
+  setHTML('db-t',yBadge); toggleCls('db-t','lit',yd>0);
+  setHTML('db-l',tBadge); toggleCls('db-l','lit',td>0);
+  setHTML('db-r',tBadge); toggleCls('db-r','lit',td>0);
+  setText('ib-y',yi+' Inn'); toggleCls('ib-y','lit',yi>0);
+  setText('ib-t',yi+' Inn');
+  setText('ib-l',ti+' Inn'); toggleCls('ib-l','lit',ti>0);
+  setText('ib-r',ti+' Inn');
+  setText('sc-y',G.yourScore||0);
+  setText('sc-t',G.theirScore||0);
+  // Active player highlight
+  const pmap={t:1,l:2,r:3};
+  ['t','l','r'].forEach(k=>{
+    const av=$('av-'+k);
+    if(av)av.classList.toggle('active-av',pmap[k]===G.currentPlayer);
+  });
+}
+
+function updateTrumpStar(){
+  ['t','l','r'].forEach(k=>{
+    const av=$('av-'+k);if(!av)return;
+    const old=av.querySelector('.trump-star');if(old)old.remove();
+  });
+  const pmap={1:'t',2:'l',3:'r'};
+  if(pmap[G.trumpDecider]){
+    const av=$('av-'+pmap[G.trumpDecider]);
+    if(av){const star=document.createElement('div');star.className='trump-star';star.textContent='★';av.appendChild(star);}
+  }
+}
+
+function setStatus(msg,yourTurn){
+  const el=$('status-bar');if(!el)return;
+  el.textContent=msg;
+  el.classList.toggle('your-turn',yourTurn);
+}
+
+// ── GAME LOGIC ──
+function cmp(a,b,ls){
+  const at=a.suit===G.trump,bt=b.suit===G.trump,al=a.suit===ls,bl=b.suit===ls;
+  if(at&&bt)return rv(a.rank)-rv(b.rank);if(at)return 1;if(bt)return -1;
+  if(al&&bl)return rv(a.rank)-rv(b.rank);if(al)return 1;if(bl)return -1;
+  return 0;
+}
+function trickWinner(played,ls){
+  // Unified: works with explicit played map OR falls back to G.trick
+  if(played){
+    const ps=Object.keys(played).map(Number);let best=ps[0];
+    for(let i=1;i<ps.length;i++){if(cmp(played[ps[i]].card,played[best].card,ls||G.leadSuit)>0)best=ps[i];}
+    return G.trick.findIndex(t=>t.player===best);
+  }
+  let best=0;
+  for(let i=1;i<G.trick.length;i++)if(cmp(G.trick[i].card,G.trick[best].card,G.leadSuit)>0)best=i;
+  return best;
+}
+
+function play(player,idx){
+  if(player===0&&!G.awaiting)return;
+  if(botTimer){clearTimeout(botTimer);botTimer=null;}
+  const card=G.hands[player][idx];
+  // Record player action BEFORE mutating trick
+  if(player===0&&G.profile){
+    const trickBefore=[...G.trick];
+    const currentWinnerEntry=trickBefore.length>0
+      ?trickBefore[trickWinner(Object.fromEntries(trickBefore.map(t=>[t.player,t])),G.leadSuit)]
+      :null;
+    recordPlayerAction(card,trickBefore,G.leadSuit,currentWinnerEntry?currentWinnerEntry.card:null);
+  }
+  G.hands[player].splice(idx,1);
+  if(G.trick.length===0)G.leadSuit=card.suit;
+  G.trick.push({player,card});
+  renderPlayedCard(player,card);
+  if(player===0){G.awaiting=false;renderHand();}
+  renderBots();
+  if(G.trick.length===4){setTimeout(resolve,900);}
+  else{
+    const i=ORDER.indexOf(player);
+    G.currentPlayer=ORDER[(i+1)%4];
+    updateUI();
+    if(G.currentPlayer===0){G.awaiting=true;setStatus('Your turn — play a card',true);renderHand();}
+    else{setStatus(`${PNAMES[G.currentPlayer]} is thinking...`,false);sched(botPlay,1400);}
+  }
+}
+
+function resolve(){
+  const tm=Object.fromEntries(G.trick.map(t=>[t.player,t]));
+  const wi=trickWinner(tm,G.leadSuit);
+  const winner=G.trick[wi].player;
+  const tens=G.trick.filter(t=>t.card.rank==='10').length;
+  const yt=winner===0||winner===1;
+  renderPlayedCard(winner,tm[winner].card,true);
+  if(yt){
+    if(tens>0){
+      G.yourDols++;             // 1 stack = 1 Dol regardless of how many 10s in it
+      G.yourTens+=tens;         // track individual 10s for scoring
+      // Store ALL ten suits won (multiple per stack possible)
+      G.trick.filter(t=>t.card.rank==='10').forEach(t=>G.yourDolSuits.push(t.card.suit));
+    } else G.yourInns++;
+  } else {
+    if(tens>0){
+      G.theirDols++;
+      G.theirTens+=tens;
+      G.trick.filter(t=>t.card.rank==='10').forEach(t=>G.theirDolSuits.push(t.card.suit));
+    } else G.theirInns++;
+  }
+  // Record played cards + update void tracker (detect who couldn't follow suit)
+  if(!G.voidTracker)G.voidTracker={};
+  G.trick.forEach(t=>{
+    G.playedCards.push({...t.card,player:t.player});
+    if(t.card.rank==='10')G.tensOut++;
+    if(G.leadSuit&&t.card.suit!==G.leadSuit){
+      recordVoid(t.player,G.leadSuit);
+      // Track discards (off-suit, non-trump plays = discards)
+      if(t.card.suit!==G.trump)recordDiscard(t.player,t.card);
+    }
+  });
+  G.tricks++;updateUI();
+  const trickLabel=tens>1?`Dol ✦✦ (${tens} tens!)`:tens===1?'Dol ✦':'Inn';
+  setStatus(`${PNAMES[winner]} wins the ${trickLabel}!`,false);
+  if(G.tricks===13){setTimeout(endRound,1400);return;}
+  setTimeout(()=>{
+    clearPlayArea();trickZ=1;
+    G.trick=[];G.leadSuit=null;G.currentPlayer=winner;updateUI();
+    if(winner===0){G.awaiting=true;setStatus('You won — lead the next trick',true);renderHand();}
+    else{setStatus(`${PNAMES[winner]} leads...`,false);sched(botPlay,1800);}
+  },2000);
+}
+
+function endRound(){
+  const yd=G.yourDols,td=G.theirDols,yi=G.yourInns,ti=G.theirInns;
+  const yt10=G.yourTens,tt10=G.theirTens; // individual 10s for scoring
+  let yp=0,tp=0;
+  if(yt10>=4){yp=5;}else if(tt10>=4){tp=5;}
+  else if(yt10===3){yp=4;tp=1;}else if(tt10===3){tp=4;yp=1;}
+  else{if(yi>=ti){yp=3;tp=2;}else{tp=3;yp=2;}}
+  G.yourScore+=yp;G.theirScore+=tp;
+
+  // Trump Decider transition — clean lookup table approach
+  const prev=G.trumpDecider;
+  const deciderYours=prev===0||prev===1;
+  const yourWon=yt10>tt10||(yt10===2&&tt10===2&&yi>=ti);
+  const trumpTeamWon=deciderYours?yourWon:!yourWon;
+  const dolsWon=deciderYours?yt10:tt10;
+  if(trumpTeamWon){
+    if(dolsWon===4)G.trumpDecider=TEAMMATE[prev]; // all 4 → teammate
+    // else 1-3 → same decider, no change
+  } else {
+    const oppDols=deciderYours?td:yd;
+    if(oppDols===4)G.trumpDecider=LEFTOPP[prev];  // all 4 → left opp
+    else G.trumpDecider=RIGHTOPP[prev];            // 1-3 → right opp
+  }
+
+  // Save round to history
+  G.roundHistory.push({round:G.round,yd,td,yi,ti,yp,tp,prevDecider:prev,newDecider:G.trumpDecider});
+  setText('result-title',`Round ${G.round} Over`);
+  // Build dol suit displays
+  const suitColor=s=>(s==='♥'||s==='♦')?`<span class="rt-dol-suit" style="color:var(--red)">${s}</span>`:`<span class="rt-dol-suit" style="color:var(--ink);filter:invert(1) brightness(2)">${s}</span>`;
+  const yourSuitsHTML=G.yourDolSuits.length>0?G.yourDolSuits.map(s=>`<span style="font-size:1.3rem;${(s==='♥'||s==='♦')?'color:var(--red)':'color:#ccc'}">${s}</span>`).join(''):'<span style="color:var(--text-faint);font-size:0.8rem">No Dols</span>';
+  const theirSuitsHTML=G.theirDolSuits.length>0?G.theirDolSuits.map(s=>`<span style="font-size:1.3rem;${(s==='♥'||s==='♦')?'color:var(--red)':'color:#ccc'}">${s}</span>`).join(''):'<span style="color:var(--text-faint);font-size:0.8rem">No Dols</span>';
+  // Show suit symbols for each individual ten won; label clearly as tens not stacks
+  setHTML('rt-your-suits',yourSuitsHTML);
+  setHTML('rt-their-suits',theirSuitsHTML);
+  // Inn count = stacks without a ten (always sums with Dol stacks to 13)
+  setText('rt-your-detail',`${yt10} ten${yt10!==1?'s':''} won · ${yi} Inn${yi!==1?'s':''}`);
+  setText('rt-their-detail',`${tt10} ten${tt10!==1?'s':''} won · ${ti} Inn${ti!==1?'s':''}`);
+  setText('rt-your-pts',`+${yp}`);
+  setText('rt-their-pts',`+${tp}`);
+  const _yp=$('rt-your-pts');if(_yp)_yp.className=`rt-pts${yp>=tp?'':' loss'}`;
+  const _tp=$('rt-their-pts');if(_tp)_tp.className=`rt-pts${tp>yp?'':' loss'}`;
+  setText('rt-total',`${G.yourScore} — ${G.theirScore}`);
+  // Trump decider change message (use module-level PNAMES to avoid conflicts)
+  let deciderMsg='';
+  if(G.trumpDecider===prev){
+    deciderMsg=`${PNAMES[prev]} keeps the Trump Decider role`;
+  } else {
+    deciderMsg=`Trump Decider passes to ${PNAMES[G.trumpDecider]}`;
+  }
+  setText('decider-msg',deciderMsg);
+
+  // Round history
+  const histEl=$('round-hist');
+  histEl.innerHTML='';
+  G.roundHistory.forEach(r=>{
+    const won=r.yp>r.tp?'Your team':r.tp>r.yp?'Their team':'Tied';
+    const row=document.createElement('div');row.className='rh-row';
+    row.innerHTML=`<span class="rh-r">Round ${r.round}</span>
+      <span>Your: ${r.yd} Dol${r.yd!==1?'s':''} / Their: ${r.td} Dol${r.td!==1?'s':''}</span>
+      <span class="rh-s">${r.yp}–${r.tp}</span>
+      <span class="rh-w">${r.yp>r.tp?'▲':''}${r.tp>r.yp?'▼':''}</span>`;
+    histEl.appendChild(row);
+  });
+
+  // Dealer info
+  const dealerPlayer=LEFTOPP[G.trumpDecider];
+  setText('round-info',`Round ${G.round+1} · Dealer: ${PNAMES[dealerPlayer]||'?'}`);
+
+  showScreen('result-screen');
+  if(G.yourScore>=21||G.theirScore>=21){
+    setTimeout(()=>{
+      document.getElementById('result-screen').classList.add('hidden');
+      document.getElementById('go-msg').textContent=(G.yourScore>=G.theirScore?'Your team wins! ':'Their team wins! ')+`Final: ${G.yourScore} – ${G.theirScore}`;
+      showScreen('gameover-screen');
+    },200);
+  }
+}
+
+function nextRoundSP(){
+  try{
+    document.getElementById('result-screen').classList.add('hidden');
+    // Ensure critical state exists before proceeding
+    if(typeof G.round!=='number')G.round=1;
+    G.round++;
+    if(!Array.isArray(G.roundHistory))G.roundHistory=[];
+    clearPlayArea();
+    // Ensure trumpDecider is valid (0-3)
+    if(typeof G.trumpDecider!=='number'||G.trumpDecider<0||G.trumpDecider>3)G.trumpDecider=0;
+    updateTrumpStar();
+    initRound();
+  }catch(e){
+    console.error('nextRoundSP error:',e);
+    // Hard fallback — reload the round from scratch
+    G.round=G.round||2;
+    G.trumpDecider=G.trumpDecider||0;
+    if(!Array.isArray(G.roundHistory))G.roundHistory=[];
+    initRound();
+  }
+}
+
+// ── BACKGROUND MUSIC ──
+let musicOn=true;
+function startMusic(){
+  const bgm=document.getElementById('bgm');
+  if(!bgm)return;
+  bgm.volume=0;
+  bgm.play().catch(()=>{});
+  // Fade in gently over 4 seconds
+  let v=0;
+  const fade=setInterval(()=>{
+    v=Math.min(v+0.005, 0.09); // max 9% volume — chill background level
+    bgm.volume=v;
+    if(v>=0.09)clearInterval(fade);
+  },200);
+}
+function toggleMusic(){
+  const bgm=document.getElementById('bgm');
+  const lbl=document.getElementById('mlabel');
+  if(!bgm)return;
+  musicOn=!musicOn;
+  if(musicOn){
+    bgm.play().catch(()=>{});
+    bgm.volume=0.09;
+    lbl.textContent='Music On';
+  } else {
+    bgm.pause();
+    lbl.textContent='Music Off';
+  }
+}
+// Start on first user interaction (browser autoplay policy)
+document.addEventListener('click',function startOnce(){
+  startMusic();
+  document.removeEventListener('click',startOnce);
+},{once:true});
+
+
+// ══════════════════════════════════════════
+// ── MULTIPLAYER (Firebase Realtime DB) ──
+// ══════════════════════════════════════════
+let MP={}, mpListener=null;
+
+// SEAT_NAMES defined above
+// SEAT_TEAMS defined above
+
+function getUID(){
+  let uid=localStorage.getItem('dol_uid');
+  if(!uid){uid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dol_uid',uid);}
+  return uid;
+}
+function genCode(){return Array.from({length:6},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*24)]).join('');}
+
+// showScreen defined above
+
+// ── Hardcoded Firebase config — no setup screen needed ──
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyDfBBEBpPZvPEmJvVT4qGVtZYF9mWya2pw",
+  authDomain:"dol-game.firebaseapp.com",
+  databaseURL:"https://dol-game-default-rtdb.firebaseio.com",
+  projectId:"dol-game",
+  storageBucket:"dol-game.firebasestorage.app",
+  messagingSenderId:"883802526955",
+  appId:"1:883802526955:web:29a6360a03e635d9d99aae"
+};
+
+function goToMultiplayer(){
+  if(!db){
+    try{initFirebase(FIREBASE_CONFIG);}
+    catch(e){console.error('Firebase init failed:',e);return;}
+  }
+  showScreen('mp-lobby-screen');
+}
+
+function initFirebase(cfg){
+  if(firebase.apps.length)firebase.app().delete();
+  const app=firebase.initializeApp(cfg);
+  db=firebase.database(app);
+}
+
+function saveFirebaseConfig(){
+  const raw=document.getElementById('fb-config-input').value.trim();
+  const errEl=document.getElementById('fb-config-error');
+  try{
+    // Strip trailing semicolons, whitespace, variable assignment wrappers
+    let cleaned=raw
+      .replace(/^\s*const\s+\w+\s*=\s*/, '') // remove "const x = "
+      .replace(/;\s*$/, '')                        // remove trailing ;
+      .trim();
+    // Quote unquoted JS object keys: word: → "word":
+    cleaned=cleaned.replace(/([{,]\s*)([a-zA-Z_$][\w$]*)\s*:/g,'$1"$2":');
+    // Replace single quotes with double quotes
+    cleaned=cleaned.replace(/'/g,'"');
+    // Wrap in braces if not already
+    if(!cleaned.startsWith('{'))cleaned='{'+cleaned+'}';
+    const cfg=JSON.parse(cleaned);
+    if(!cfg.databaseURL){errEl.textContent='Missing databaseURL — check your config';return;}
+    initFirebase(cfg);
+    localStorage.setItem('dol_fb_config',JSON.stringify(cfg));
+    errEl.textContent='';
+    showScreen('mp-lobby-screen');
+  } catch(e){
+    errEl.textContent='Invalid config — paste the object from Firebase console';
+  }
+}
+
+// [endRound defined above]
+
+
+// ── ROUTERS ──
+function nextRound(){
+  if(G.isMultiplayer){mpNextRound();}
+  else{nextRoundSP();}
+}
+function handlePickTrump(suit){
+  if(G.isMultiplayer){mpPickTrump(suit);}
+  else{pickTrump(suit);}
+}
+function pickTrumpSP(suit){pickTrump(suit);}
+
+
+// ── VOID & DISCARD TRACKING ──
+function recordVoid(player,suit){
+  if(!G.voidTracker)G.voidTracker={};
+  if(!G.voidTracker[player])G.voidTracker[player]=new Set();
+  G.voidTracker[player].add(suit);
+}
+function isKnownVoid(player,suit){return !!(G.voidTracker&&G.voidTracker[player]&&G.voidTracker[player].has(suit));}
+// [recordDiscard defined above]
+
+// ── BOT AI ──
+// Clean rebuild based on agreed spec.
+// Trump logic, Dol protection, piggyback — no legacy tactics.
+
+// ── Core helpers ──
+
+function canBeat(card, ls) {
+  if (G.trick.length === 0) return true;
+  const tm = Object.fromEntries(G.trick.map(t => [t.player, t]));
+  const wi = trickWinner(tm, ls || G.leadSuit);
+  const best = G.trick[wi].card;
+  return cmp(card, best, ls || G.leadSuit) > 0;
+}
+
+function stackHasTen() {
+  return G.trick.some(t => t.card.rank === '10');
+}
+
+function lowest(h, pi) {
+  if (!pi || pi.length === 0) return undefined;
+  return pi.reduce((a, b) => rv(h[a].rank) < rv(h[b].rank) ? a : b);
+}
+
+function lowestNonTen(h, pi) {
+  if (!pi || pi.length === 0) return undefined;
+  const nt = pi.filter(i => h[i] && h[i].rank !== '10');
+  const pool = nt.length > 0 ? nt : pi;
+  return pool.reduce((a, b) => rv(h[a].rank) < rv(h[b].rank) ? a : b);
+}
+
+// Cheapest card in pi that beats the current trick winner
+function cheapestWinner(h, pi) {
+  if (!pi || pi.length === 0) return null;
+  const winners = pi.filter(i => h[i] && canBeat(h[i], G.leadSuit));
+  if (winners.length === 0) return null;
+  return winners.reduce((a, b) => rv(h[a].rank) < rv(h[b].rank) ? a : b);
+}
+
+// recordDiscard: called from resolve() to track off-suit plays
+function recordDiscard(player, card) {
+  if (!G.discardTracker) G.discardTracker = {};
+  if (!G.discardTracker[player]) G.discardTracker[player] = [];
+  G.discardTracker[player].push({ suit: card.suit, rank: card.rank });
+}
+
+// Is a trump card in my hand guaranteed to win?
+// True only if no other player holds a higher trump.
+function isTrumpGuaranteedWinner(card, p) {
+  if (card.suit !== G.trump) return false;
+  const cardRank = rv(card.rank);
+  for (let pl = 0; pl < 4; pl++) {
+    if (pl === p) continue;
+    if (G.hands[pl] && G.hands[pl].some(c => c.suit === G.trump && rv(c.rank) > cardRank)) return false;
+  }
+  return true;
+}
+
+// Trump exhaustion condition: Ace + King + 4 or more other trump cards (6+ trump total)
+function qualifiesForTrumpExhaustion(h) {
+  const trumpCards = h.filter(c => c.suit === G.trump);
+  if (trumpCards.length < 6) return false;
+  return trumpCards.some(c => c.rank === 'A') && trumpCards.some(c => c.rank === 'K');
+}
+
+// ── Trump suit scoring (used by botPickTrump) ──
+function scoreTrumpSuit(suit, hand) {
+  const cards = hand.filter(c => c.suit === suit);
+  let score = cards.length * 2;
+  if (cards.some(c => c.rank === 'A')) score += 4;
+  if (cards.some(c => c.rank === 'K')) score += 3;
+  if (cards.some(c => c.rank === 'Q')) score += 2;
+  if (cards.some(c => c.rank === 'A') && cards.some(c => c.rank === 'K')) score += 3;
+  return score;
+}
+
+// ════════════════════════════════════════════════════
+// ── BOT PLAY — main decision function ──
+// ════════════════════════════════════════════════════
+function botPlay() {
+  const p = G.currentPlayer;
+  const h = G.hands[p];
+  const isOpp = p === 2 || p === 3;
+  const ally = TEAMMATE[p];
+
+  // ── Build playable indices ──
+  let pi = [];
+  let voidInLeadSuit = false;
+  if (G.leadSuit) {
+    const follow = h.map((c, i) => c.suit === G.leadSuit ? i : -1).filter(i => i >= 0);
+    if (follow.length > 0) { pi = follow; }
+    else { pi = h.map((_, i) => i); voidInLeadSuit = true; }
+  } else {
+    pi = h.map((_, i) => i);
+  }
+
+  // ── Game state ──
+  const myTens  = isOpp ? G.theirTens : G.yourTens;
+  const oppTens = isOpp ? G.yourTens  : G.theirTens;
+  const allTensOut = G.tensOut >= 4;
+  const tiebreakerMode = allTensOut && myTens === 2 && oppTens === 2;
+
+  // ── Card group shortcuts ──
+  const trumpPi        = pi.filter(i => h[i] && h[i].suit === G.trump);
+  const nonTrumpNonTen = pi.filter(i => h[i] && h[i].suit !== G.trump && h[i].rank !== '10');
+  const nonTenPi       = pi.filter(i => h[i] && h[i].rank !== '10');
+  const tenPi          = pi.filter(i => h[i] && h[i].rank === '10');
+
+  // ── Tactic logger ──
+  const cardStr = i => h[i] ? `${h[i].rank}${h[i].suit}` : '?';
+  function logTactic(tactic, idx) {
+    console.log(`[${PNAMES[p]}] Trick ${G.tricks+1} | ${tactic} → plays ${cardStr(idx)}`);
+  }
+
+  let chosen;
+
+  // ════════════════════════════════════════
+  // ── LEADING (first card of a trick) ──
+  // ════════════════════════════════════════
+  if (G.trick.length === 0) {
+
+    if (qualifiesForTrumpExhaustion(h) && !tiebreakerMode) {
+      const trumpAce  = trumpPi.find(i => h[i].rank === 'A');
+      const trumpKing = trumpPi.find(i => h[i].rank === 'K');
+      chosen = trumpAce  !== undefined ? trumpAce  :
+               trumpKing !== undefined ? trumpKing :
+               lowest(h, trumpPi);
+      logTactic('LEAD: Trump exhaustion', chosen);
+    }
+
+    else if (tiebreakerMode) {
+      const guaranteedTrump = trumpPi.find(i => isTrumpGuaranteedWinner(h[i], p));
+      chosen = guaranteedTrump !== undefined
+        ? guaranteedTrump
+        : lowestNonTen(h, nonTrumpNonTen.length > 0 ? nonTrumpNonTen : nonTenPi);
+      logTactic(guaranteedTrump !== undefined ? 'LEAD: Tiebreaker guaranteed trump' : 'LEAD: Tiebreaker normal', chosen);
+    }
+
+    else {
+      const allyVoid10 = (() => {
+        if (G.tricks > 4) return null;
+        for (const suit of SUITS) {
+          if (suit === G.trump) continue;
+          if (!isKnownVoid(ally, suit)) continue;
+          const ten = pi.find(i => h[i] && h[i].suit === suit && h[i].rank === '10');
+          if (ten !== undefined) return ten;
+        }
+        return null;
+      })();
+      if (allyVoid10 !== null) {
+        chosen = allyVoid10;
+        logTactic('LEAD: Ally-void 10 setup', chosen);
+      } else {
+        chosen = lowestNonTen(h, nonTrumpNonTen.length > 0 ? nonTrumpNonTen : nonTenPi);
+        logTactic('LEAD: Normal (lowest non-trump non-10)', chosen);
+      }
+    }
+
+    if (chosen === undefined || chosen === null) {
+      chosen = lowestNonTen(h, nonTenPi.length > 0 ? nonTenPi : pi);
+      logTactic('LEAD: Fallback (all 10s)', chosen);
+    }
+  }
+
+  // ════════════════════════════════════════
+  // ── FOLLOWING (2nd, 3rd, 4th card) ──
+  // ════════════════════════════════════════
+  else {
+    const dolAtStake = stackHasTen();
+
+    const tm = Object.fromEntries(G.trick.map(t => [t.player, t]));
+    const wi = trickWinner(tm, G.leadSuit);
+    const currentWinner = G.trick[wi].player;
+    const winCard    = G.trick[wi].card;
+    const winIsTrump = winCard.suit === G.trump;
+    const winRank    = rv(winCard.rank);
+    const teamWinning = isOpp
+      ? (currentWinner === 2 || currentWinner === 3)
+      : (currentWinner === 0 || currentWinner === 1);
+
+    const playersLeft  = ORDER.filter(pl => !G.trick.some(t => t.player === pl) && pl !== p);
+    const isLastToPlay = playersLeft.length === 0;
+    const enemies      = isOpp ? [0, 1] : [2, 3];
+    const enemiesLeft  = playersLeft.filter(pl => enemies.includes(pl));
+
+    // ── Trump ally's 10 lead ──
+    if (voidInLeadSuit && dolAtStake && trumpPi.length > 0) {
+      const allyLedTen = G.trick[0].player === ally && G.trick[0].card.rank === '10';
+      if (allyLedTen) {
+        const trumpWin = cheapestWinner(h, trumpPi);
+        const play_idx = trumpWin !== null ? trumpWin : lowest(h, trumpPi);
+        if (play_idx != null && pi.includes(play_idx)) {
+          logTactic('FOLLOW: Trump ally\'s 10 lead', play_idx);
+          play(p, play_idx); return;
+        }
+      }
+    }
+
+    // ── Piggyback ──
+    if (teamWinning && tenPi.length > 0) {
+      let piggybackSafe = false;
+      if (isLastToPlay) {
+        piggybackSafe = true;
+      } else if (winIsTrump && winRank === 14) {
+        piggybackSafe = true;
+      } else {
+        const enemyCanBeat = enemiesLeft.some(e => {
+          if (!G.hands[e]) return false;
+          const higherInSuit = !winIsTrump &&
+            G.hands[e].some(c => c.suit === G.leadSuit && rv(c.rank) > winRank);
+          const canRuff = !winIsTrump &&
+            !G.hands[e].some(c => c.suit === G.leadSuit) &&
+            G.hands[e].some(c => c.suit === G.trump);
+          const canOvertrump = winIsTrump &&
+            G.hands[e].some(c => c.suit === G.trump && rv(c.rank) > winRank);
+          return higherInSuit || canRuff || canOvertrump;
+        });
+        piggybackSafe = !enemyCanBeat;
+      }
+      if (piggybackSafe) {
+        const nonTrumpTen = tenPi.filter(i => h[i].suit !== G.trump);
+        chosen = nonTrumpTen.length > 0 ? nonTrumpTen[0] : tenPi[0];
+        if (chosen != null && pi.includes(chosen)) {
+          logTactic('FOLLOW: Piggyback 10', chosen);
+          play(p, chosen); return;
+        }
+      }
+    }
+
+    // ── 10 protection ──
+    if (!dolAtStake) {
+      const iHoldTheTen = tenPi.length > 0;
+      const enemyStillToPlay = enemiesLeft.length > 0;
+      if (enemyStillToPlay && !iHoldTheTen) {
+        const protectors = pi.filter(i =>
+          h[i] && h[i].rank !== '10' && rv(h[i].rank) >= 11 && canBeat(h[i], G.leadSuit)
+        );
+        if (protectors.length > 0) {
+          chosen = protectors.reduce((a, b) => rv(h[a].rank) < rv(h[b].rank) ? a : b);
+          if (chosen != null && pi.includes(chosen)) {
+            logTactic('FOLLOW: 10 protection (raise bar)', chosen);
+            play(p, chosen); return;
+          }
+        }
+      }
+    }
+
+    // ── Dol at stake ──
+    if (dolAtStake) {
+      if (teamWinning) {
+        const pool = nonTrumpNonTen.length > 0 ? nonTrumpNonTen :
+                     nonTenPi.length > 0 ? nonTenPi : pi;
+        chosen = lowestNonTen(h, pool);
+        logTactic('FOLLOW: Dol secured — dump low', chosen);
+      } else {
+        if (!voidInLeadSuit) {
+          const suitPi = pi.filter(i => h[i] && h[i].suit === G.leadSuit && h[i].rank !== '10');
+          const winner = cheapestWinner(h, suitPi.length > 0 ? suitPi :
+                           nonTenPi.filter(i => h[i] && h[i].suit === G.leadSuit));
+          if (winner !== null) {
+            chosen = winner;
+            logTactic('FOLLOW: Fight Dol (cheapest winner in suit)', chosen);
+          } else {
+            chosen = lowestNonTen(h, nonTenPi.length > 0 ? nonTenPi : pi);
+            logTactic('FOLLOW: Fight Dol — can\'t win, dump low', chosen);
+          }
+        } else {
+          const trumpWinner = cheapestWinner(h, trumpPi);
+          if (trumpWinner !== null) {
+            chosen = trumpWinner;
+            logTactic('FOLLOW: Fight Dol — trump (void in suit)', chosen);
+          } else {
+            chosen = lowestNonTen(h, nonTenPi.length > 0 ? nonTenPi : pi);
+            logTactic('FOLLOW: Fight Dol — can\'t win even with trump, dump low', chosen);
+          }
+        }
+      }
+    }
+
+    // ── Inn ──
+    else {
+      if (tiebreakerMode) {
+        if (!voidInLeadSuit) {
+          const suitNonTen = pi.filter(i => h[i] && h[i].suit === G.leadSuit && h[i].rank !== '10');
+          const pool = suitNonTen.length > 0 ? suitNonTen : nonTenPi;
+          if (isLastToPlay) {
+            const winner = cheapestWinner(h, pool);
+            chosen = winner !== null ? winner : lowest(h, pool);
+            logTactic('FOLLOW: Tiebreaker Inn — last to play', chosen);
+          } else {
+            chosen = lowest(h, pool.length > 0 ? pool : pi);
+            logTactic('FOLLOW: Tiebreaker Inn — play low', chosen);
+          }
+        } else {
+          const trumpWinner = cheapestWinner(h, trumpPi);
+          chosen = trumpWinner !== null
+            ? trumpWinner
+            : lowestNonTen(h, nonTenPi.length > 0 ? nonTenPi : pi);
+          logTactic('FOLLOW: Tiebreaker Inn — trump (void)', chosen);
+        }
+      } else {
+        const pool = nonTrumpNonTen.length > 0 ? nonTrumpNonTen :
+                     nonTenPi.length > 0 ? nonTenPi : pi;
+        chosen = lowest(h, pool);
+        logTactic('FOLLOW: Inn — dump low', chosen);
+      }
+    }
+
+    // ── Safety: never dump a 10 when losing ──
+    if (chosen !== undefined && h[chosen] && h[chosen].rank === '10' && !teamWinning) {
+      const alt = lowestNonTen(h, pi.filter(i => h[i] && h[i].rank !== '10'));
+      if (alt !== undefined && pi.includes(alt)) {
+        logTactic('SAFETY: Swap out 10 while losing', alt);
+        chosen = alt;
+      }
+    }
+  }
+
+  // ── Final safety net ──
+  if (chosen == null || chosen === undefined || !pi.includes(chosen)) chosen = pi[0];
+  if (!h[chosen]) chosen = pi.find(i => h[i] !== undefined) ?? 0;
+  logTactic('FINAL', chosen);
+  play(p, chosen);
+}
+
+</script>
+
+  <!-- MULTIPLAYER LOBBY -->
+  <div class="screen hidden" id="mp-lobby-screen" style="gap:16px;">
+    <div class="screen-title">Play Online</div>
+    <input id="mp-name-input" placeholder="Your name" maxlength="16"
+      style="width:100%;max-width:280px;background:rgba(0,0,0,0.4);border:1px solid rgba(212,168,67,0.2);border-radius:8px;color:var(--text);font-family:'Cinzel',serif;font-size:0.85rem;padding:12px 14px;outline:none;letter-spacing:0.06em;">
+    <button class="btn" onclick="mpCreateRoom()" style="width:100%;max-width:280px;">Create Room</button>
+    <div style="font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;color:var(--dim);">— OR JOIN —</div>
+    <input id="mp-code-input" placeholder="ROOM CODE" maxlength="6"
+      style="width:100%;max-width:280px;background:rgba(0,0,0,0.4);border:1px solid rgba(212,168,67,0.2);border-radius:8px;color:var(--text);font-family:'Cinzel',serif;font-size:1.1rem;padding:12px 14px;outline:none;letter-spacing:0.3em;text-align:center;text-transform:uppercase;">
+    <button class="btn-ghost" onclick="mpJoinRoom()" style="width:100%;max-width:280px;">Join Room</button>
+    <div id="mp-lobby-error" style="font-family:'Cormorant Garamond',serif;color:#e05c4b;font-size:0.9rem;font-style:italic;min-height:1.2rem;text-align:center;"></div>
+    <button class="btn-ghost" onclick="showScreen('start-screen')" style="width:100%;max-width:280px;">Back</button>
+  </div>
+
+  <!-- WAITING ROOM -->
+  <div class="screen hidden" id="mp-wait-screen" style="gap:16px;text-align:center;">
+    <div class="screen-title">Waiting Room</div>
+    <div id="wait-code" onclick="copyRoomCode()"
+      style="font-family:'Cinzel Decorative',serif;font-size:2rem;color:var(--gold2);letter-spacing:0.25em;background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.2);border-radius:10px;padding:10px 24px;cursor:pointer;">
+      ------
+    </div>
+    <div style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--dim);font-size:0.9rem;">Tap code to copy · Share with 3 friends</div>
+    <div id="wait-seats" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:320px;"></div>
+    <div id="wait-status" style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--dim);font-size:0.9rem;">Waiting...</div>
+    <button class="btn hidden" id="start-game-btn" onclick="mpStartGame()" style="width:100%;max-width:280px;">Start Game</button>
+    <button class="btn-ghost" onclick="mpLeaveRoom()" style="width:100%;max-width:280px;">Leave</button>
+  </div>
+
+</body>
+</html>
